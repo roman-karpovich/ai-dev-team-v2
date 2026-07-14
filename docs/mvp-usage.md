@@ -100,9 +100,14 @@ For an incident or bug fix, preserve the existing failure policy unless the
 owner explicitly changes it. A choice that changes exit or restart, retry or
 skip, cursor or checkpoint advancement, transaction boundaries, or
 partial-success behavior is normative and never a reversible assumption.
-Inspect targeted history plus runtime and supervisor configuration first. If
-multiple viable contracts remain, present the evidence and ask one focused
-owner decision before starting state or editing.
+Re-derive the baseline through the final production-relevant observer,
+including whether and when it is reachable under relevant concurrency,
+shutdown, buffering, and framework behavior. Inspect targeted history plus
+runtime and supervisor configuration first. `Fail-fast` or `restart` does not
+silently define a timing or termination SLA. A fix that bypasses normal stack
+unwinding or cleanup, or changes the fate of sibling work, requires an explicit
+owner decision. If multiple viable contracts remain, present the evidence and
+ask one focused owner decision before starting state or editing.
 
 Evidence from a sibling repository, ignored symlink target, deployment
 snapshot, or runtime configuration outside the selected worktree is external
@@ -110,9 +115,14 @@ operational evidence. Record its provenance and freshness; it is not a
 verified repository fact from the task snapshot.
 
 For behavior-changing code, prefer a focused failing test first. Reproduce the
-defect at the closest deterministic production seam and assert the observable
-outcome plus relevant persistence, propagation, or process lifecycle. A new
-mock or log call alone is insufficient evidence when those semantics matter.
+defect at the closest deterministic production seam. For an incident fix,
+compare baseline and candidate at the same final observer, including complete
+downstream disposition, reachability, timing, and signal cardinality. Assert
+the observable outcome plus relevant persistence, propagation, or process
+lifecycle. A new mock or log call alone is insufficient evidence when those
+semantics matter; replacing the mechanism that performs the claimed outcome
+proves only the local call unless production-equivalent behavior is separately
+demonstrated.
 Never copy a secret-bearing `.env` or credential-bearing runtime config into a
 worktree to run a check. Use project fixtures or minimal dummy non-secret
 values, keep secrets out of tool output, and report the check as blocked when
@@ -127,6 +137,11 @@ Otherwise completion may proceed after proportionate verification while
 disclosing that review did not run. Green tests or a builder checkpoint must
 not imply independent acceptance.
 
+When the accepted task contract or owner requires a trusted, full-cycle, or
+two-model result, one reviewer is insufficient. Required independent paths
+form conclusions before disclosure, and material disagreement is adjudicated
+from evidence before acceptance.
+
 For a standalone cold review, use a one-off Codex CLI launch that disables both
 memory directions before the session starts. It does not edit global config.
 For a linked worktree, the narrow additional writable root lets ADT update its
@@ -139,6 +154,16 @@ codex -C "$WORKSPACE" \
   --add-dir "$ADT_STATE_ROOT" \
   -c 'memories.use_memories=false' \
   -c 'memories.generate_memories=false'
+```
+
+For a one-off Claude Code CLI cold review, disable auto-memory only for that
+process and avoid session persistence; this does not change global memory
+configuration:
+
+```bash
+CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 \
+  claude -p --model claude-opus-4-8 --no-session-persistence \
+  "$(cat REVIEW_PROMPT.md)"
 ```
 
 Do not pre-create ADT state for a standalone cold review. The reviewer performs
@@ -254,6 +279,10 @@ manual:
 5. Only after B's report is fixed, disclose and merge A's model or fallback
    evidence during adjudication, compare the two reports, and resolve
    disagreements from repository evidence.
+
+A standalone `ACCEPT` remains one judgment path, not a trusted or final
+acceptance. A trusted result exists only after every declared independent path
+has completed and material disagreement has been adjudicated.
 
 If reviewer B sees A's conclusions before forming its own, label the run
 independence-compromised and restart from neutral context. This MVP has no

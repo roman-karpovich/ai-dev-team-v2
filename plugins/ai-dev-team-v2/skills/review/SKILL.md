@@ -26,11 +26,14 @@ two-model review. Run it before inspecting the artifact or mutating ADT state.
   `-c 'memories.use_memories=false'` and
   `-c 'memories.generate_memories=false'`, then invoke this skill. Do not edit
   global config for a cold review. An in-session setting cannot restore
-  independence after memory has already entered the context. On another host,
-  establish the equivalent memory-clean session. If that is impossible,
-  continue only when the user accepts a non-independent validation. Telling
-  the model to ignore contaminated context is insufficient because it has
-  already primed the review.
+  independence after memory has already entered the context. For a one-off
+  Claude Code CLI review, set `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` before the
+  process starts and use `--no-session-persistence`; this does not change
+  global memory configuration. On another host, establish the equivalent
+  memory-clean session. If that is impossible, continue only when the user
+  accepts a non-independent validation. Telling the model to ignore
+  contaminated context is insufficient because it has already primed the
+  review.
 
 ## Resolve the Claude model boundary
 
@@ -134,7 +137,10 @@ model identity or a silent fallback.
   baseline and compare baseline and candidate at the same production-relevant
   seam, including framework or runtime behavior outside the diff. Preserve the
   failure's complete downstream disposition through its final framework or
-  process boundary. A harness that catches the failure before a terminal
+  process boundary. Establish whether and when the final observer is reachable
+  under relevant concurrency, shutdown, buffering, and framework lifecycle;
+  eventual behavior after blocked work is released is not equivalent to prompt
+  failure handling. A harness that catches the failure before a terminal
   observer changes an unhandled path and is not an equivalent counterfactual;
   account for all downstream observers and the signal cardinality. Treat a
   test that disables, replaces, or bypasses a load-bearing mechanism in that
@@ -204,6 +210,12 @@ factual checkpoint:
 ```text
 adt --workspace "$WORKSPACE" checkpoint --host "$HOST" --lease "$LEASE" --note "$NOTE"
 ```
+
+A standalone `ACCEPT` is one judgment path, not a trusted or final acceptance.
+When the accepted contract or owner requires a trusted or multi-path result,
+all required independent paths must fix their conclusions before disclosure,
+and any material disagreement must be adjudicated from evidence. A standalone
+review report may still complete without making that stronger claim.
 
 Pause when interrupted. Outside the cold-review protocol, hand off only on the
 user's explicit request, then direct the user to invoke the review skill in a

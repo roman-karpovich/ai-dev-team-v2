@@ -67,10 +67,18 @@ subagents, workflows, tools, or project instructions.
      the owner explicitly changes it. A choice that changes exit or restart,
      retry or skip, cursor or checkpoint advancement, transaction boundaries,
      or partial-success behavior is normative and never a reversible
-     assumption. Inspect targeted history plus runtime and supervisor
-     configuration before changing that boundary. If multiple viable contracts
-     remain, present the evidence and ask one focused owner decision before
-     starting state or editing.
+     assumption. Re-derive the baseline failure mechanism through its final
+     production-relevant observer, including whether and when that observer is
+     reachable under relevant concurrency, shutdown, buffering, and framework
+     behavior. Inspect targeted history plus runtime and supervisor
+     configuration before changing that boundary. Do not infer a timing or
+     termination SLA from `fail-fast` or `restart`. New evidence may invalidate
+     the plan, but it does not authorize strengthening the owner's contract. A
+     fix that bypasses normal stack unwinding or cleanup, or changes the fate of
+     sibling work, is a normative failure-policy change and requires an
+     explicit owner decision. If multiple viable contracts remain, present the
+     evidence and ask one focused owner decision before starting state or
+     editing.
 7. For the new-task path in step 6, before any edit, form a compact neutral
    task contract from the preserved owner intent, corrected factual premises,
    and repository evidence. Use the contract as the existing `--goal` value;
@@ -164,10 +172,14 @@ subagents, workflows, tools, or project instructions.
   execution evidence, not part of `GOAL`, and requires no new state field.
 
 - For behavior-changing code, prefer a focused failing test first. Reproduce
-  the defect at the closest deterministic production seam and assert the
-  observable outcome plus relevant persistence, propagation, or process
-  lifecycle. A new mock or log call alone is insufficient evidence when those
-  semantics matter.
+  the defect at the closest deterministic production seam. For an incident or
+  bug fix, compare baseline and candidate at the same final observer and
+  preserve the complete downstream disposition, reachability, timing, and
+  signal cardinality. Assert the observable outcome plus relevant persistence,
+  propagation, or process lifecycle. A new mock or log call alone is
+  insufficient evidence when those semantics matter. A test that replaces the
+  mechanism that performs the claimed outcome proves only the local call unless
+  production-equivalent behavior is independently demonstrated.
 - Never copy a secret-bearing `.env` or credential-bearing runtime config into
   another worktree to run a check. Prefer project test fixtures or minimal
   dummy non-secret values, and keep secrets out of tool output and checkpoints.
@@ -201,5 +213,9 @@ subagents, workflows, tools, or project instructions.
   exact fresh review invocation. Otherwise completion may proceed after
   proportionate verification while disclosing that review did not run. Green
   tests or a builder checkpoint must not imply independent acceptance.
+- When the accepted task contract or owner requires a trusted, full-cycle, or
+  two-model result, one reviewer is insufficient. The required independent
+  paths must form conclusions before disclosure, and any material disagreement
+  must be adjudicated from evidence before acceptance.
 - Do not claim full production assurance. This MVP proves resumable control
   boundaries; stronger evidence and release gates remain separate work.

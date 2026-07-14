@@ -170,6 +170,23 @@ class SkillContractTest(unittest.TestCase):
             incident,
         )
 
+    def test_develop_rederives_incident_causality_without_expanding_failure_policy(self) -> None:
+        incident = self.develop[
+            self.develop.index("in an incident or bug fix") :
+            self.develop.index("for the new-task path")
+        ]
+        for required in (
+            "re-derive the baseline failure mechanism",
+            "final production-relevant observer",
+            "whether and when that observer is reachable",
+            "do not infer a timing or termination sla from `fail-fast` or `restart`",
+            "normal stack unwinding or cleanup",
+            "fate of sibling work",
+            "explicit owner decision",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, incident)
+
     def test_develop_verification_guardrails_cover_behavior_and_secrets(self) -> None:
         verification = self.develop[
             self.develop.index("for behavior-changing code") :
@@ -178,8 +195,11 @@ class SkillContractTest(unittest.TestCase):
         for required in (
             "focused failing test first",
             "closest deterministic production seam",
+            "compare baseline and candidate at the same final observer",
+            "complete downstream disposition, reachability, timing, and signal cardinality",
             "persistence, propagation, or process lifecycle",
             "a new mock or log call alone is insufficient evidence",
+            "replaces the mechanism that performs the claimed outcome",
             "never copy a secret-bearing `.env`",
             "minimal dummy non-secret values",
         ):
@@ -195,6 +215,9 @@ class SkillContractTest(unittest.TestCase):
             "implementation checkpoint",
             "otherwise completion may proceed after proportionate verification",
             "must not imply independent acceptance",
+            "trusted, full-cycle, or two-model result",
+            "one reviewer is insufficient",
+            "material disagreement must be adjudicated",
         ):
             self.assertIn(required, boundary)
 
@@ -321,6 +344,8 @@ class SkillContractTest(unittest.TestCase):
             "independence-compromised",
             "memories.use_memories=false",
             "memories.generate_memories=false",
+            "claude_code_disable_auto_memory=1",
+            "--no-session-persistence",
             "before the session starts",
             "one-off",
             "global config",
@@ -335,6 +360,8 @@ class SkillContractTest(unittest.TestCase):
                 self.assertIn(required, self.review)
 
         self.assertNotIn("/memories", self.review)
+        self.assertIn("claude_code_disable_auto_memory=1", self.usage)
+        self.assertIn("--no-session-persistence", self.usage)
 
     def test_reviewer_owns_state_start_after_preflight(self) -> None:
         for required in (
@@ -394,6 +421,8 @@ class SkillContractTest(unittest.TestCase):
             "compare baseline and candidate at the same production-relevant seam",
             "framework or runtime behavior outside the diff",
             "complete downstream disposition",
+            "whether and when the final observer is reachable",
+            "concurrency, shutdown, buffering, and framework lifecycle",
             "catches the failure before a terminal observer",
             "all downstream observers and the signal cardinality",
             "baseline already satisfies the claimed outcome",
@@ -408,6 +437,18 @@ class SkillContractTest(unittest.TestCase):
         ):
             with self.subTest(required=required):
                 self.assertIn(required, review_work)
+
+    def test_single_review_accept_is_not_a_trusted_result(self) -> None:
+        boundary = self.review[self.review.index("## record the boundary") :]
+        for required in (
+            "one judgment path",
+            "not a trusted or final acceptance",
+            "required independent paths",
+            "material disagreement",
+            "adjudicated",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, boundary)
 
     def test_review_reuses_only_ready_focused_test_runtimes(self) -> None:
         for required in (
