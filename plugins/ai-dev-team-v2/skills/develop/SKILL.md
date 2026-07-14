@@ -15,7 +15,25 @@ subagents, workflows, tools, or project instructions.
    to run `make mvp-install` from an AI Dev Team v2 checkout, then start a new
    host session. Do not simulate durable state.
 2. Set `HOST` to the product executing this skill: `codex` in Codex and
-   `claude` in Claude Code. Never claim to be the other host.
+   `claude` in Claude Code. Never claim to be the other host. Host is not the
+   model. For `HOST=claude`, resolve the Claude model boundary before
+   repository orientation, ADT state, or editing when possible:
+   - Follow the owner's explicit model choice, subject to host availability and
+     the applicable data policy. Otherwise use the current manual guidance:
+     Opus 4.8 for bounded, well-specified, or routine work; Fable 5 for
+     highest-complexity, long-horizon, architecture-wide, or high-ambiguity
+     work.
+   - Model, task complexity, and assurance profile are independent. Do not
+     infer the model from `--profile`; profiles never route models. Do not
+     create an automatic router or silently fall back through a CLI, SDK, or
+     API.
+   - If the selected Claude model is unavailable, ineligible under the
+     applicable policy, or refuses the work, stop and return control to the
+     owner for a visible manual choice. If a simple task already runs in Fable,
+     do not restart merely to downgrade. If Opus is materially underpowered for
+     a frontier task, recommend a fresh Fable session before ADT state or
+     repository exposure. The owner may explicitly accept a visible Opus
+     continuation; record that degraded tradeoff.
 3. Before editing or starting state, do the minimum read-only orientation
    needed to identify the actual target Git worktree. A task file, launcher
    directory, or knowledge repository may only be context; do not bind state
@@ -122,6 +140,11 @@ subagents, workflows, tools, or project instructions.
   ```text
   adt --workspace "$WORKSPACE" checkpoint --host "$HOST" --lease "$LEASE" --note "$NOTE"
   ```
+
+  When the host reliably exposes the actual model, include it and any visible
+  fallback or switch in the factual checkpoint or completion summary;
+  otherwise record `unknown`. Never infer it from the requested model. This is
+  execution evidence, not part of `GOAL`, and requires no new state field.
 
 - Run the smallest relevant verification once. Tests are evidence to inspect,
   not proof by themselves.

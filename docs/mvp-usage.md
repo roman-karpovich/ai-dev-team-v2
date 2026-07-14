@@ -121,7 +121,39 @@ build, pull, or widen the run to broad or live-network smoke for that purpose.
 
 ## Start in Claude Code
 
-Start Claude Code in the target repository and invoke the namespaced skill:
+### Choose a Claude model
+
+Choose the model before exposing repository material when possible, then start
+Claude Code in the target repository. Use the full pinned ID so later evidence
+is attributable; short aliases are only interactive conveniences:
+
+```bash
+claude --model claude-opus-4-8
+claude --model claude-fable-5
+```
+
+The current manual starting guidance is Opus 4.8 for bounded, well-specified,
+or routine work, and Fable 5 for highest-complexity, long-horizon,
+architecture-wide, or high-ambiguity work. The owner's explicit choice
+overrides this guidance, subject to host availability and the applicable data
+policy. Host, model, task complexity, and assurance profile are independent;
+`critical` expresses the required assurance, not a Fable selection. AI Dev
+Team has no automatic model router or silent/API fallback, and profiles never
+route models.
+
+Check Fable availability and data-policy eligibility before repository
+exposure. If the selected Claude model is unavailable, ineligible under the
+applicable policy, or refuses the work, stop and return control to the owner
+for a visible manual choice. Do not restart a simple task already running in
+Fable merely to downgrade. If Opus is materially underpowered for a frontier
+task, recommend a fresh Fable session before ADT state or artifact exposure;
+the owner may instead accept a visible Opus continuation as a degraded
+tradeoff. Record the actual model and any visible fallback or switch only when
+the host reliably exposes them; otherwise record `unknown`. This is execution
+evidence in existing checkpoints and reports, not a new CLI option, state
+field, or `GOAL` field.
+
+Invoke the namespaced skill:
 
 ```text
 /ai-dev-team:develop Implement the requested account export feature.
@@ -171,7 +203,8 @@ manual:
 2. Keep A's findings in that native session. Before handoff, write only a
    neutral checkpoint containing the intent, exact scope and snapshot,
    acceptance criteria, known owner supersessions, and permitted checks. Do not
-   include findings, suspected files, severities, or fixes.
+   include findings, suspected files, severities, fixes, or reviewer A's model
+   or fallback evidence until B has fixed its conclusions.
 3. Hand off and open a fresh session in provider B. Before inspecting the
    artifact, check the context already supplied by the host for prior findings,
    suspected locations, severities, fixes, or expected conclusions. For Codex,
@@ -179,7 +212,8 @@ manual:
    before the session starts. The skill performs the same check on any existing
    ADT context before resume. Do not paste A's output into the session.
 4. Let B state and checkpoint its own conclusions.
-5. Only after B's report is fixed, compare the two reports and adjudicate
+5. Only after B's report is fixed, disclose and merge A's model or fallback
+   evidence during adjudication, compare the two reports, and resolve
    disagreements from repository evidence.
 
 If reviewer B sees A's conclusions before forming its own, label the run

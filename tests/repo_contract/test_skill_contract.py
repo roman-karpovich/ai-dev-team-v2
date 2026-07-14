@@ -182,6 +182,80 @@ class SkillContractTest(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, self.usage)
 
+    def test_claude_model_choice_is_manual_and_orthogonal(self) -> None:
+        for required in (
+            "claude --model claude-opus-4-8",
+            "claude --model claude-fable-5",
+            "bounded, well-specified, or routine work",
+            "highest-complexity, long-horizon, architecture-wide, or high-ambiguity work",
+            "host, model, task complexity, and assurance profile are independent",
+            "owner's explicit choice overrides",
+            "no automatic model router",
+            "profiles never route models",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.usage)
+
+        for surface_name, surface in (
+            ("usage", self.usage),
+            ("develop", self.develop),
+            ("review", self.review),
+        ):
+            with self.subTest(surface=surface_name):
+                self.assertIn("if the selected claude model is unavailable", surface)
+                self.assertIn("return control to the owner", surface)
+
+    def test_develop_resolves_claude_model_before_repository_work(self) -> None:
+        host = self.develop.index("set `host`")
+        model = self.develop.index("resolve the claude model boundary")
+        orientation = self.develop.index("minimum read-only orientation")
+        self.assertLess(host, model)
+        self.assertLess(model, orientation)
+
+        for required in (
+            "host is not the model",
+            "do not infer the model from `--profile`",
+            "do not restart merely to downgrade",
+            "fresh fable session before adt state",
+            "visible opus continuation",
+            "actual model",
+            "otherwise record `unknown`",
+            "execution evidence, not part of `goal`",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.develop)
+
+    def test_review_model_boundary_preserves_coldness_and_evidence(self) -> None:
+        preflight = self.review.index("## independence preflight")
+        model = self.review.index("## resolve the claude model boundary")
+        connect = self.review.index("## connect to the task")
+        self.assertLess(preflight, model)
+        self.assertLess(model, connect)
+
+        for required in (
+            "before artifact inspection",
+            "switching models after contamination does not restore independence",
+            "fresh neutral session",
+            "actual model",
+            "otherwise record `unknown`",
+            "intended model identity or a silent fallback",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.review)
+
+    def test_second_review_keeps_model_evidence_out_of_neutral_handoff(self) -> None:
+        for surface_name, surface in (
+            ("usage", self.usage),
+            ("review", self.review),
+        ):
+            for required in (
+                "reviewer a's model or fallback evidence",
+                "until b has fixed its conclusions",
+                "disclose and merge a's model or fallback evidence during adjudication",
+            ):
+                with self.subTest(surface=surface_name, required=required):
+                    self.assertIn(required, surface)
+
     def test_independence_preflight_precedes_review_connection(self) -> None:
         preflight = self.review.index("## independence preflight")
         connect = self.review.index("## connect to the task")

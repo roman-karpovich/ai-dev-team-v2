@@ -32,6 +32,33 @@ two-model review. Run it before inspecting the artifact or mutating ADT state.
   the model to ignore contaminated context is insufficient because it has
   already primed the review.
 
+## Resolve the Claude model boundary
+
+After the Independence preflight and before artifact inspection, ADT state, or
+repository orientation, resolve the model boundary when the current host is
+Claude Code. Host, model, task complexity, and assurance profile are
+independent. Follow the owner's explicit choice, subject to host availability
+and the applicable data policy; otherwise prefer Opus 4.8 for bounded,
+well-specified, or routine work and Fable 5 for highest-complexity,
+long-horizon, architecture-wide, or high-ambiguity work. Do not infer a model
+from `--profile`, automatically route one, or silently fall back through a CLI,
+SDK, or API.
+
+If the selected Claude model is unavailable, ineligible under the applicable
+policy, or refuses the review, stop and return control to the owner for a
+visible manual choice. Do not restart a simple review already running in Fable
+merely to downgrade. If Opus is materially underpowered for a frontier review,
+recommend a fresh Fable session before ADT state or artifact exposure; the
+owner may explicitly accept a visible Opus continuation as a degraded
+tradeoff. Switching models after contamination does not restore independence.
+A fallback or switch after artifact inspection or prior findings requires a
+fresh neutral session and another preflight.
+
+After the reviewer has fixed its conclusions, record the actual model and any
+visible fallback or switch only when the host reliably exposes them; otherwise
+record `unknown`. Do not claim provider or model diversity from an intended
+model identity or a silent fallback.
+
 ## Connect to the task
 
 1. Require `adt` on `PATH`. If `command -v adt` fails, stop and tell the user
@@ -123,7 +150,8 @@ protocol:
 
 1. Reviewer A forms its findings in its native session. Keep those findings out
    of `adt` state and do not pass them, suspected locations, severities, or
-   proposed fixes to reviewer B.
+   proposed fixes to reviewer B. Keep reviewer A's model or fallback evidence
+   out of the neutral handoff until B has fixed its conclusions.
 2. Before handoff, record only a neutral note containing authoritative intent,
    known owner supersessions, exact scope and snapshot, accepted criteria, and
    permitted checks. Then use
@@ -135,7 +163,8 @@ protocol:
    label the attempt `independence-compromised`.
 4. After B has stated its conclusions, record B's reviewed scope, checks, and
    findings with `checkpoint --host "$HOST" --lease "$LEASE" --note "$NOTE"`.
-5. Only then reveal A's report and compare agreements, unique findings, and
+5. Only then reveal A's report, disclose and merge A's model or fallback
+   evidence during adjudication, and compare agreements, unique findings, and
    disagreements. Resolve disputed claims from repository evidence. Do not
    complete the joint review before this comparison unless the user explicitly
    requests two unadjudicated reports.
