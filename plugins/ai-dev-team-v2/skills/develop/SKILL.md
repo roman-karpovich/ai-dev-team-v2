@@ -157,6 +157,15 @@ subagents, workflows, tools, or project instructions.
 - Reassess when evidence invalidates the plan, fixes repeat, scope grows, or
   exceptions accumulate. Pause, replan, reshape, or discard an increment when
   it begins to distort the architecture; do not defend sunk cost.
+- Treat a review finding as evidence about the candidate, not authority to
+  enlarge the accepted task contract. Before repairing it, trace it to the
+  accepted outcome or a repository constraint. Do not implement an adjacent
+  guarantee without an owner decision. If an in-scope repair materially adds
+  state, concurrency coordination, or dependence of correctness or proof on
+  non-public dependency behavior, reopen the plan and compare simpler
+  contract-preserving alternatives. Keep that complexity only when repository
+  evidence shows it is load-bearing for the accepted outcome; otherwise
+  reshape or discard it.
 - Work in useful increments. After a meaningful, coherent increment, record a
   concise neutral checkpoint containing established facts, owner decisions and
   requirement supersessions, artifact state, checks, and open questions rather
@@ -217,5 +226,11 @@ subagents, workflows, tools, or project instructions.
   two-model result, one reviewer is insufficient. The required independent
   paths must form conclusions before disclosure, and any material disagreement
   must be adjudicated from evidence before acceptance.
+- Builder-spawned subagents and repeated review passes inside the builder's
+  active session may advise the implementation, but they do not count as
+  independent judgment paths. A counted path starts in a fresh preflighted
+  session, receives only neutral context, and fixes its conclusion under the
+  review embargo. A two-model claim additionally requires evidence of distinct
+  actual models.
 - Do not claim full production assurance. This MVP proves resumable control
   boundaries; stronger evidence and release gates remain separate work.

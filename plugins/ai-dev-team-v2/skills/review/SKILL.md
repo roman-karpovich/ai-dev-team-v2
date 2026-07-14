@@ -34,6 +34,12 @@ two-model review. Run it before inspecting the artifact or mutating ADT state.
   accepts a non-independent validation. Telling the model to ignore
   contaminated context is insufficient because it has already primed the
   review.
+- Builder-spawned subagents and repeated review passes inside the builder's
+  active session may advise the implementation, but they do not count as
+  independent judgment paths. A counted path starts in a fresh preflighted
+  session, receives only neutral context, and fixes its conclusion under the
+  review embargo. A two-model claim additionally requires evidence of distinct
+  actual models.
 
 ## Resolve the Claude model boundary
 
@@ -166,6 +172,14 @@ model identity or a silent fallback.
   no safe focused setup exists.
 - Do not modify code unless the user explicitly requests review-and-repair.
   Keep findings independent before beginning any repair.
+- When review-and-repair is authorized, treat each finding as evidence about
+  the candidate, not authority to enlarge the accepted task contract. Trace a
+  repair to the accepted outcome or a repository constraint; an adjacent
+  guarantee requires an owner decision. If the repair materially adds state,
+  concurrency coordination, or dependence of correctness or proof on
+  non-public dependency behavior, keep that complexity only when repository
+  evidence shows it is load-bearing for the accepted outcome; otherwise use a
+  simpler contract-preserving repair or discard it.
 - Report actionable findings first, ordered by severity. Give a precise
   location, impact, triggering conditions, and supporting evidence. If there
   are no findings, state residual coverage gaps and uncertainty explicitly.

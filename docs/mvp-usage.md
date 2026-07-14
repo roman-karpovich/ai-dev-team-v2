@@ -123,6 +123,16 @@ lifecycle. A new mock or log call alone is insufficient evidence when those
 semantics matter; replacing the mechanism that performs the claimed outcome
 proves only the local call unless production-equivalent behavior is separately
 demonstrated.
+
+A review finding is evidence about the candidate, not authority to enlarge the
+accepted task contract. Before repair, trace it to the accepted outcome or a
+repository constraint. An adjacent guarantee requires an owner decision. If an
+in-scope repair materially adds state, concurrency coordination, or dependence
+of correctness or proof on non-public dependency behavior, compare simpler
+contract-preserving alternatives and keep the complexity only when repository
+evidence shows it is load-bearing for the accepted outcome; otherwise reshape
+or discard it.
+
 Never copy a secret-bearing `.env` or credential-bearing runtime config into a
 worktree to run a check. Use project fixtures or minimal dummy non-secret
 values, keep secrets out of tool output, and report the check as blocked when
@@ -141,6 +151,13 @@ When the accepted task contract or owner requires a trusted, full-cycle, or
 two-model result, one reviewer is insufficient. Required independent paths
 form conclusions before disclosure, and material disagreement is adjudicated
 from evidence before acceptance.
+
+Builder-spawned subagents and repeated review passes inside the builder's
+active session may advise the implementation, but they do not count as
+independent judgment paths. A counted path starts in a fresh preflighted
+session, receives only neutral context, and fixes its conclusion under the
+review embargo. A two-model claim additionally requires evidence of distinct
+actual models.
 
 For a standalone cold review, use a one-off Codex CLI launch that disables both
 memory directions before the session starts. It does not edit global config.

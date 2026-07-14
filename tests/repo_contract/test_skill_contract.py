@@ -221,6 +221,49 @@ class SkillContractTest(unittest.TestCase):
         ):
             self.assertIn(required, boundary)
 
+    def test_builder_subagents_are_advisory_not_independent_paths(self) -> None:
+        boundary = self.develop[self.develop.index("before asking to commit") :]
+        for surface_name, surface in (
+            ("develop", boundary),
+            ("review", self.review),
+            ("usage", self.usage),
+        ):
+            for required in (
+                "builder-spawned subagents",
+                "active session",
+                "may advise",
+                "do not count as independent judgment paths",
+                "fresh preflighted session",
+                "only neutral context",
+                "distinct actual models",
+            ):
+                with self.subTest(surface=surface_name, required=required):
+                    self.assertIn(required, surface)
+
+    def test_review_findings_cannot_expand_contract_or_complexity(self) -> None:
+        develop_work = self.develop[
+            self.develop.index("## work natively") :
+            self.develop.index("## leave a safe boundary")
+        ]
+        for surface_name, surface in (
+            ("develop", develop_work),
+            ("review", self.review),
+            ("usage", self.usage),
+        ):
+            for required in (
+                "evidence about the candidate, not authority",
+                "accepted outcome or a repository constraint",
+                "adjacent guarantee",
+                "owner decision",
+                "state",
+                "concurrency coordination",
+                "non-public dependency behavior",
+                "load-bearing for the accepted outcome",
+                "discard",
+            ):
+                with self.subTest(surface=surface_name, required=required):
+                    self.assertIn(required, surface)
+
     def test_develop_skips_state_only_when_no_repository_work_remains(self) -> None:
         for surface in (self.develop, self.usage):
             for required in (
