@@ -557,6 +557,13 @@ def _task_view(task: dict[str, Any], *, include_lease_id: bool) -> dict[str, Any
 def command_start(
     workspace: GitWorkspace, store: StateStore, arguments: argparse.Namespace
 ) -> dict[str, Any]:
+    goal = arguments.goal.strip()
+    if not goal:
+        raise CliError(
+            "goal_invalid",
+            "Goal must contain non-whitespace text.",
+        )
+
     with store.lock():
         timestamp = _now()
         state_value = store.load() or _new_state(workspace, timestamp)
@@ -577,7 +584,7 @@ def command_start(
             "id": f"task_{uuid.uuid4().hex}",
             "kind": arguments.kind,
             "profile": arguments.profile,
-            "goal": arguments.goal,
+            "goal": goal,
             "status": "active",
             "lease": _new_lease(arguments.host, timestamp),
             "resume_host": None,

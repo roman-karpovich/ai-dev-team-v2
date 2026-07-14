@@ -131,6 +131,27 @@ class AdtCliTest(unittest.TestCase):
         )
         self.assertEqual("task_open", error["error"]["code"])
 
+    def test_start_rejects_blank_goal_without_creating_state(self) -> None:
+        for goal in ("", " \n\t"):
+            with self.subTest(goal=goal):
+                error, _ = self._adt(
+                    "start",
+                    "--host",
+                    "codex",
+                    "--goal",
+                    goal,
+                    expected_code=3,
+                )
+                self.assertEqual("goal_invalid", error["error"]["code"])
+                self.assertEqual(
+                    [],
+                    list(
+                        (self.repo / ".git" / "ai-dev-team").glob(
+                            "workspaces/*/state.json"
+                        )
+                    ),
+                )
+
     def test_status_context_and_list_use_read_only_shared_lock(self) -> None:
         self._start()
         state_path, state = self._stored_state()
