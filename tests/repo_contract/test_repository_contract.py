@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from pathlib import Path
 
@@ -40,6 +41,21 @@ class RepositoryContractTest(unittest.TestCase):
         entrypoint = (ROOT / "scripts/test-fast").read_text()
         self.assertNotIn("make test", entrypoint)
         self.assertNotIn("test-all", entrypoint)
+
+    def test_host_plugin_versions_share_one_release_base(self) -> None:
+        codex = json.loads(
+            (ROOT / "plugins/ai-dev-team-v2/.codex-plugin/plugin.json").read_text()
+        )
+        claude = json.loads(
+            (ROOT / "plugins/ai-dev-team-v2/.claude-plugin/plugin.json").read_text()
+        )
+        marketplace = json.loads(
+            (ROOT / ".claude-plugin/marketplace.json").read_text()
+        )
+
+        release_version = claude["version"]
+        self.assertEqual(release_version, codex["version"].split("+", 1)[0])
+        self.assertEqual(release_version, marketplace["plugins"][0]["version"])
 
 
 if __name__ == "__main__":
