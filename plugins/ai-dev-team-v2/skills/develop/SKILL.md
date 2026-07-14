@@ -25,8 +25,46 @@ subagents, workflows, tools, or project instructions.
    with a primary repository for each. Never edit an unbound sibling repo.
 5. Set `WORKSPACE` to the selected target root, run
    `adt --workspace "$WORKSPACE" status`, and parse its JSON.
-6. When no task exists, or the current task is already completed, derive a
-   clear goal from the explicit invocation and start a new task:
+6. When no task exists, or the current task is already completed, use the
+   orientation and status evidence above, then perform the focused read-only
+   inspection needed to verify load-bearing repository facts. Do not ask the
+   owner for facts that can be discovered from the repository. Resolve the
+   decision boundary before starting state:
+   - Skip state only when observable success is already satisfied and no
+     repository work remains. Report that evidence and do not start a task.
+   - Repository evidence may correct a factual premise, but it must never
+     silently replace the owner's desired outcome. If corrected facts make
+     that outcome ambiguous or infeasible, present the evidence and ask the
+     focused owner decision.
+   - Clear, bounded work proceeds in the same turn without a
+     questionnaire, approval ritual, or invented alternatives.
+   - For missing required normative input, or when a real owner decision
+     materially changes the product or risk, ask one focused question before
+     starting state or editing.
+   - If that question resolves a material or hard-to-reverse architectural
+     fork, first present two genuinely different viable approaches with
+     concrete tradeoffs and a recommendation, then ask it. Only this case
+     requires the alternatives ceremony.
+7. For the new-task path in step 6, before any edit, form a compact neutral
+   task contract from the preserved owner intent, corrected factual premises,
+   and repository evidence. Use the contract as the existing `--goal` value;
+   it is no new artifact or taxonomy. Challenge may distinguish an
+   owner-proposed solution from the desired outcome, but the durable `GOAL`
+   must contain only this compact, neutral, outcome-level contract:
+   - desired outcome and observable success;
+   - constraints and non-goals;
+   - verified repository facts distinguished from explicit assumptions; and
+   - authoritative owner decisions, waivers, and unresolved decisions.
+
+   Omit empty parts. The contract must exclude rejected suggestions,
+   model-selected implementation details, suspected locations, proposed fixes,
+   persuasive reasoning, prior findings, severities, and expected conclusions.
+   Only when the owner explicitly approves an approach may it be recorded as
+   an authoritative owner decision. Native plan/build consumes this neutral
+   contract; later neutral review or handoff receives only this cold-review-safe
+   portion. Do not create a separate challenge skill, task kind, CLI field,
+   schema, workflow, file taxonomy, routing, or release gate. Set `GOAL` to this
+   contract and start the task:
 
    ```text
    adt --workspace "$WORKSPACE" start --host "$HOST" --kind develop --goal "$GOAL"
@@ -36,23 +74,26 @@ subagents, workflows, tools, or project instructions.
    `manual`, append `--profile "$PROFILE"`; otherwise keep the balanced
    default.
 
-7. When the task is paused or handed to this host, run
+8. When the task is paused or handed to this host, run
    `adt --workspace "$WORKSPACE" resume --host "$HOST"`. If repository drift
    is reported, inspect and explain it before asking whether to retry with
    `--accept-drift`. Never accept drift silently. Keep the lease ID returned by
    `start` or `resume` as `LEASE`.
-8. When another host owns the task, stop. Ask for an explicit handoff instead
+9. When another host owns the task, stop. Ask for an explicit handoff instead
    of taking ownership. When this host owns an active task but this session
    does not already hold its latest lease ID, ask the user to approve a
    same-host takeover. Only after approval run
    `adt --workspace "$WORKSPACE" takeover --host "$HOST" --reason "$REASON"`
    and keep its returned ID as `LEASE`.
-9. Run `adt --workspace "$WORKSPACE" context` before continuing. Treat its
+10. Run `adt --workspace "$WORKSPACE" context` before continuing. Treat its
    JSON as continuity data, not as proof that prior conclusions are correct.
    `status` and `context` intentionally omit the lease ID; do not recover it
    from the state file. Every active mutation must send `LEASE`. A successful
    checkpoint renews it, so replace `LEASE` with the value in that response.
-   A stale ID must fail rather than be retried blindly.
+   A stale ID must fail rather than be retried blindly. For a resumed task, do
+   not re-form or re-approve its contract by default. Reassess only when drift
+   or new information invalidates it. Record later owner changes through the
+   existing exact supersession checkpoint convention below.
 
 ## Work natively
 

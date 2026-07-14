@@ -29,6 +29,159 @@ class SkillContractTest(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, self.develop)
 
+    def test_develop_goal_follows_orientation_and_status_before_start(self) -> None:
+        orientation = self.develop.index("minimum read-only orientation")
+        status = self.develop.index('adt --workspace "$workspace" status')
+        contract = self.develop.index("form a compact neutral task contract")
+        start = self.develop.index('adt --workspace "$workspace" start')
+
+        self.assertLess(orientation, status)
+        self.assertLess(status, contract)
+        self.assertLess(contract, start)
+
+        for required in (
+            "before any edit",
+            "focused read-only inspection",
+            "do not ask the owner for facts that can be discovered",
+            "for the new-task path",
+            "preserved owner intent, corrected factual premises",
+            "existing `--goal` value",
+            "desired outcome and observable success",
+            "constraints and non-goals",
+            "verified repository facts",
+            "explicit assumptions",
+            "authoritative owner decisions, waivers, and unresolved decisions",
+            "omit empty parts",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.develop)
+
+    def test_develop_goal_excludes_cold_review_contamination(self) -> None:
+        goal_contract = self.develop[
+            self.develop.index("the durable `goal` must contain only") :
+            self.develop.index("set `goal` to this contract")
+        ]
+        allowed_fields = goal_contract[: goal_contract.index("omit empty parts")]
+        exclusions = goal_contract[goal_contract.index("must exclude") :]
+
+        for allowed in (
+            "desired outcome and observable success",
+            "constraints and non-goals",
+            "verified repository facts distinguished from explicit assumptions",
+            "authoritative owner decisions, waivers, and unresolved decisions",
+        ):
+            with self.subTest(allowed=allowed):
+                self.assertIn(allowed, allowed_fields)
+
+        for contamination in (
+            "prior findings",
+            "suspected locations",
+            "severities",
+            "proposed fixes",
+            "expected conclusions",
+        ):
+            with self.subTest(contamination=contamination):
+                self.assertIn(contamination, self.review)
+                self.assertIn(contamination, exclusions)
+
+        for excluded in (
+            "rejected suggestions",
+            "model-selected implementation details",
+            "persuasive reasoning",
+        ):
+            with self.subTest(excluded=excluded):
+                self.assertIn(excluded, exclusions)
+
+        for required in (
+            "may distinguish an owner-proposed solution from the desired outcome",
+            "only when the owner explicitly approves an approach",
+            "authoritative owner decision",
+            "native plan/build consumes this neutral contract",
+            "later neutral review or handoff receives only this cold-review-safe portion",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.develop)
+
+    def test_develop_contract_keeps_clear_work_low_ceremony(self) -> None:
+        for surface in (self.develop, self.usage):
+            for required in (
+                "same turn",
+                "without a questionnaire",
+                "approval ritual",
+                "invented alternatives",
+            ):
+                with self.subTest(surface=surface[:20], required=required):
+                    self.assertIn(required, surface)
+
+    def test_develop_contract_preserves_required_owner_input(self) -> None:
+        for surface in (self.develop, self.usage):
+            for required in (
+                "missing required normative input",
+                "owner decision materially changes the product or risk",
+                "one focused question",
+                "before starting state or editing",
+            ):
+                with self.subTest(surface=surface[:20], required=required):
+                    self.assertIn(required, surface)
+
+    def test_develop_contract_gives_architectural_forks_extra_ceremony(self) -> None:
+        for required in (
+            "material or hard-to-reverse architectural fork",
+            "two genuinely different viable approaches",
+            "concrete tradeoffs",
+            "recommendation",
+            "only this case requires the alternatives ceremony",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.develop)
+
+        decision_gate = self.develop.index("material or hard-to-reverse architectural fork")
+        start = self.develop.index('adt --workspace "$workspace" start')
+        self.assertLess(decision_gate, start)
+
+    def test_develop_contract_separates_facts_from_owner_authority(self) -> None:
+        for surface in (self.develop, self.usage):
+            for required in (
+                "repository evidence may correct a factual premise",
+                "never silently replace the owner's desired outcome",
+                "ambiguous or infeasible",
+                "present the evidence",
+                "focused owner decision",
+            ):
+                with self.subTest(surface=surface[:20], required=required):
+                    self.assertIn(required, surface)
+
+    def test_develop_skips_state_only_when_no_repository_work_remains(self) -> None:
+        for surface in (self.develop, self.usage):
+            for required in (
+                "observable success is already satisfied",
+                "no repository work remains",
+                "skip state only",
+            ):
+                with self.subTest(surface=surface[:20], required=required):
+                    self.assertIn(required, surface)
+            self.assertNotIn("no implementation is needed", surface)
+
+    def test_develop_contract_is_reused_on_resume_and_preserves_exclusions(self) -> None:
+        for required in (
+            "do not re-form or re-approve",
+            "drift or new information invalidates",
+            "existing exact supersession checkpoint convention",
+            "no new artifact or taxonomy",
+            "separate challenge skill, task kind, cli field, schema, workflow, file taxonomy, routing, or release gate",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.develop)
+
+        for required in (
+            "compact neutral task contract",
+            "existing `--goal`",
+            "do not re-form or re-approve",
+            "drift or new information invalidates",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.usage)
+
     def test_independence_preflight_precedes_review_connection(self) -> None:
         preflight = self.review.index("## independence preflight")
         connect = self.review.index("## connect to the task")

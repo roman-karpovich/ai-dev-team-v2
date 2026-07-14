@@ -59,6 +59,35 @@ The skill starts or resumes the workspace task and then lets Codex use its
 normal dialogue, planning, subagents, tools, and focused verification. Ordinary
 coding requests do not opt into AI Dev Team state.
 
+For a new or completed development task, the skill first performs read-only
+worktree orientation, checks ADT status, and inspects the repository facts
+needed to resolve the request without asking the owner for discoverable facts.
+If repository work remains, it forms a compact neutral task contract and uses
+it as the existing `--goal`. The durable contract contains only the desired
+outcome and observable success, constraints and non-goals, verified repository
+facts distinguished from explicit assumptions, and authoritative owner
+decisions, waivers, or unresolved decisions. The host may challenge or
+distinguish an owner-proposed solution, but it does not persist rejected
+suggestions, model-selected implementation details, suspected locations,
+proposed fixes, persuasive reasoning, prior findings, severities, or expected
+conclusions. An approach enters the contract only when the owner explicitly
+approves it as an authoritative decision. Empty parts are omitted; native
+plan/build consumes this cold-review-safe continuity, and later neutral review
+or handoff receives only that safe portion. This is not a new artifact or
+taxonomy.
+
+Clear, bounded work proceeds in the same turn without a questionnaire,
+approval ritual, or invented alternatives. Skip state only when observable
+success is already satisfied and no repository work remains; report the
+evidence. Repository evidence may correct a factual premise, but it must never
+silently replace the owner's desired outcome. If corrected facts make that
+outcome ambiguous or infeasible, present the evidence and ask the focused owner
+decision. Missing required normative input requires one focused question before
+starting state or editing; so does a case where a real owner decision materially
+changes the product or risk. Only when that question resolves a material or
+hard-to-reverse architectural fork does the host first present two genuinely
+different viable approaches, concrete tradeoffs, and a recommendation.
+
 For a standalone cold review, use a one-off Codex CLI launch that disables both
 memory directions before the session starts. It does not edit global config.
 For a linked worktree, the narrow additional writable root lets ADT update its
@@ -189,7 +218,10 @@ Checkpoint what is established and pause this task because the API contract is p
 After new information arrives, open either the owning host or the host named by
 a handoff and invoke the relevant skill again. The skill inspects status and
 context before continuing. Repository drift is reported; accepting it requires
-an explicit decision after inspection.
+an explicit decision after inspection. Do not re-form or re-approve the task
+contract on resume by default; reassess it only when drift or new information
+invalidates it. Later owner changes use the existing exact supersession
+checkpoint convention.
 
 ## Inspect state directly
 
