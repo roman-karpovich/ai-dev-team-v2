@@ -88,6 +88,37 @@ changes the product or risk. Only when that question resolves a material or
 hard-to-reverse architectural fork does the host first present two genuinely
 different viable approaches, concrete tradeoffs, and a recommendation.
 
+For an incident or bug fix, preserve the existing failure policy unless the
+owner explicitly changes it. A choice that changes exit or restart, retry or
+skip, cursor or checkpoint advancement, transaction boundaries, or
+partial-success behavior is normative and never a reversible assumption.
+Inspect targeted history plus runtime and supervisor configuration first. If
+multiple viable contracts remain, present the evidence and ask one focused
+owner decision before starting state or editing.
+
+Evidence from a sibling repository, ignored symlink target, deployment
+snapshot, or runtime configuration outside the selected worktree is external
+operational evidence. Record its provenance and freshness; it is not a
+verified repository fact from the task snapshot.
+
+For behavior-changing code, prefer a focused failing test first. Reproduce the
+defect at the closest deterministic production seam and assert the observable
+outcome plus relevant persistence, propagation, or process lifecycle. A new
+mock or log call alone is insufficient evidence when those semantics matter.
+Never copy a secret-bearing `.env` or credential-bearing runtime config into a
+worktree to run a check. Use project fixtures or minimal dummy non-secret
+values, keep secrets out of tool output, and report the check as blocked when
+no safe focused setup exists.
+
+Before asking to commit or open a PR, the builder always states whether
+independent review ran. Missing review blocks completion only when the selected
+assurance profile, accepted task contract, or owner requires it. In that case
+the result is an implementation checkpoint and the existing manual handoff
+flow supplies the fresh review invocation when the owner requests review.
+Otherwise completion may proceed after proportionate verification while
+disclosing that review did not run. Green tests or a builder checkpoint must
+not imply independent acceptance.
+
 For a standalone cold review, use a one-off Codex CLI launch that disables both
 memory directions before the session starts. It does not edit global config.
 For a linked worktree, the narrow additional writable root lets ADT update its

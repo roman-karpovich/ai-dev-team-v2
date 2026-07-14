@@ -137,6 +137,10 @@ model identity or a silent fallback.
   use it. Do not install dependencies, build, or pull merely to fill a review
   gap. This bounded discovery does not authorize a broad suite or live-network
   smoke; report the exact residual coverage gap if no ready runtime works.
+- Never copy a secret-bearing `.env` or credential-bearing runtime config into
+  the review worktree. Use existing test fixtures or minimal dummy non-secret
+  values, keep secrets out of tool output, and report the check as blocked when
+  no safe focused setup exists.
 - Do not modify code unless the user explicitly requests review-and-repair.
   Keep findings independent before beginning any repair.
 - Report actionable findings first, ordered by severity. Give a precise

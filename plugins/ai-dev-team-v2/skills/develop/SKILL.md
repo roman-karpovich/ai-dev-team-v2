@@ -63,6 +63,14 @@ subagents, workflows, tools, or project instructions.
      fork, first present two genuinely different viable approaches with
      concrete tradeoffs and a recommendation, then ask it. Only this case
      requires the alternatives ceremony.
+   - In an incident or bug fix, preserve the existing failure policy unless
+     the owner explicitly changes it. A choice that changes exit or restart,
+     retry or skip, cursor or checkpoint advancement, transaction boundaries,
+     or partial-success behavior is normative and never a reversible
+     assumption. Inspect targeted history plus runtime and supervisor
+     configuration before changing that boundary. If multiple viable contracts
+     remain, present the evidence and ask one focused owner decision before
+     starting state or editing.
 7. For the new-task path in step 6, before any edit, form a compact neutral
    task contract from the preserved owner intent, corrected factual premises,
    and repository evidence. Use the contract as the existing `--goal` value;
@@ -73,6 +81,11 @@ subagents, workflows, tools, or project instructions.
    - constraints and non-goals;
    - verified repository facts distinguished from explicit assumptions; and
    - authoritative owner decisions, waivers, and unresolved decisions.
+
+   Treat a sibling repository, ignored symlink target, deployment snapshot, or
+   runtime configuration outside the selected worktree as external operational
+   evidence. Record its provenance and freshness; it is not a verified
+   repository fact from the task snapshot.
 
    Omit empty parts. The contract must exclude rejected suggestions,
    model-selected implementation details, suspected locations, proposed fixes,
@@ -103,8 +116,11 @@ subagents, workflows, tools, or project instructions.
    same-host takeover. Only after approval run
    `adt --workspace "$WORKSPACE" takeover --host "$HOST" --reason "$REASON"`
    and keep its returned ID as `LEASE`.
-10. Run `adt --workspace "$WORKSPACE" context` before continuing. Treat its
-   JSON as continuity data, not as proof that prior conclusions are correct.
+10. After resume, takeover, or handoff, run
+   `adt --workspace "$WORKSPACE" context` before continuing. A fresh `start`
+   already returns the new task and does not need an immediate duplicate
+   context read. Treat context JSON as continuity data, not as proof that prior
+   conclusions are correct.
    `status` and `context` intentionally omit the lease ID; do not recover it
    from the state file. Every active mutation must send `LEASE`. A successful
    checkpoint renews it, so replace `LEASE` with the value in that response.
@@ -122,7 +138,8 @@ subagents, workflows, tools, or project instructions.
 - Inspect the repository and challenge material ambiguity, weak requirements,
   unsafe tradeoffs, and architectural mismatch. Ask the user only when their
   decision changes the product or risk; otherwise make a stated, reversible
-  assumption and proceed.
+  assumption and proceed. The normative failure-policy boundaries above are
+  never reversible assumptions.
 - Separate owner decisions and accepted tradeoffs from checkable facts. Record
   the former explicitly and verify the latter from repository evidence. When
   an owner changes a requirement, record the authoritative owner, the exact old
@@ -146,6 +163,17 @@ subagents, workflows, tools, or project instructions.
   otherwise record `unknown`. Never infer it from the requested model. This is
   execution evidence, not part of `GOAL`, and requires no new state field.
 
+- For behavior-changing code, prefer a focused failing test first. Reproduce
+  the defect at the closest deterministic production seam and assert the
+  observable outcome plus relevant persistence, propagation, or process
+  lifecycle. A new mock or log call alone is insufficient evidence when those
+  semantics matter.
+- Never copy a secret-bearing `.env` or credential-bearing runtime config into
+  another worktree to run a check. Prefer project test fixtures or minimal
+  dummy non-secret values, and keep secrets out of tool output and checkpoints.
+  If no safe focused setup exists, report the check as blocked. On accidental
+  exposure, stop, remove the copy, notify the owner, and redact local artifacts
+  when authorized.
 - Run the smallest relevant verification once. Tests are evidence to inspect,
   not proof by themselves.
 
@@ -165,5 +193,13 @@ subagents, workflows, tools, or project instructions.
 
 - Never launch another provider's CLI, SDK, MCP server, or model. MVP handoff
   is manual and checkpoint-based.
+- Before asking to commit or open a PR, always state whether independent review
+  ran. Missing review blocks completion only when the selected assurance
+  profile, accepted task contract, or owner requires it. In that case call the
+  result an implementation checkpoint, keep the task active, and, when the
+  owner requests the manual review, use the handoff flow above and give the
+  exact fresh review invocation. Otherwise completion may proceed after
+  proportionate verification while disclosing that review did not run. Green
+  tests or a builder checkpoint must not imply independent acceptance.
 - Do not claim full production assurance. This MVP proves resumable control
   boundaries; stronger evidence and release gates remain separate work.

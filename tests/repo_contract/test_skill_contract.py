@@ -151,6 +151,53 @@ class SkillContractTest(unittest.TestCase):
                 with self.subTest(surface=surface[:20], required=required):
                     self.assertIn(required, surface)
 
+    def test_develop_preserves_incident_failure_policy_before_start(self) -> None:
+        incident = self.develop[
+            self.develop.index("in an incident or bug fix") :
+            self.develop.index("for the new-task path")
+        ]
+        self.assertLess(
+            self.develop.index("in an incident or bug fix"),
+            self.develop.index('adt --workspace "$workspace" start'),
+        )
+        self.assertIn(
+            "preserve the existing failure policy unless the owner explicitly changes it",
+            incident,
+        )
+        self.assertIn("is normative and never a reversible assumption", incident)
+        self.assertIn(
+            "inspect targeted history plus runtime and supervisor configuration before changing that boundary",
+            incident,
+        )
+
+    def test_develop_verification_guardrails_cover_behavior_and_secrets(self) -> None:
+        verification = self.develop[
+            self.develop.index("for behavior-changing code") :
+            self.develop.index("run the smallest relevant verification once")
+        ]
+        for required in (
+            "focused failing test first",
+            "closest deterministic production seam",
+            "persistence, propagation, or process lifecycle",
+            "a new mock or log call alone is insufficient evidence",
+            "never copy a secret-bearing `.env`",
+            "minimal dummy non-secret values",
+        ):
+            self.assertIn(required, verification)
+        self.assertIn("never copy a secret-bearing `.env`", self.review)
+
+    def test_develop_review_gate_is_explicitly_conditional(self) -> None:
+        boundary = self.develop[self.develop.index("before asking to commit") :]
+        for required in (
+            "always state whether independent review ran",
+            "missing review blocks completion only when the selected assurance profile, "
+            "accepted task contract, or owner requires it",
+            "implementation checkpoint",
+            "otherwise completion may proceed after proportionate verification",
+            "must not imply independent acceptance",
+        ):
+            self.assertIn(required, boundary)
+
     def test_develop_skips_state_only_when_no_repository_work_remains(self) -> None:
         for surface in (self.develop, self.usage):
             for required in (
