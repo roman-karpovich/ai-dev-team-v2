@@ -168,7 +168,13 @@ class AdtCliTest(unittest.TestCase):
         self.assertIsNotNone(spec.loader)
         runtime = importlib.util.module_from_spec(spec)
         sys.modules[spec.name] = runtime
-        spec.loader.exec_module(runtime)
+        self.addCleanup(sys.modules.pop, spec.name, None)
+        previous_dont_write_bytecode = sys.dont_write_bytecode
+        sys.dont_write_bytecode = True
+        try:
+            spec.loader.exec_module(runtime)
+        finally:
+            sys.dont_write_bytecode = previous_dont_write_bytecode
 
         workspace = runtime.GitWorkspace(
             root=self.repo,

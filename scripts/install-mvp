@@ -82,6 +82,39 @@ raise SystemExit(0 if any(item.get("id") == plugin_id for item in items) else 1)
 ' "$plugin_id"
 }
 
+claude_plugin_install_path() {
+  local plugin_id="${1:-$plugin@$marketplace}"
+  claude plugin list --json \
+    | python3 -c '
+import json
+import sys
+
+plugin_id = sys.argv[1]
+items = json.load(sys.stdin)
+for item in items:
+    if item.get("id") == plugin_id:
+        print(item.get("installPath", ""))
+        raise SystemExit(0)
+raise SystemExit(1)
+' "$plugin_id"
+}
+
+verify_claude_install() {
+  local source="$repo_root/plugins/$plugin_dir"
+  local installed
+  installed="$(claude_plugin_install_path)"
+
+  if [[ ! -d "$installed" ]]; then
+    echo "Claude reported an invalid install path for $plugin@$marketplace" >&2
+    return 1
+  fi
+  if ! diff -qr -x __pycache__ -x '*.pyc' "$source" "$installed" >/dev/null; then
+    echo "Claude's cached plugin does not match the local source" >&2
+    echo "bump the plugin version in both Claude manifests, then reinstall" >&2
+    return 1
+  fi
+}
+
 has_codex_plugin() {
   local plugin_id="${1:-$plugin@$marketplace}"
   codex plugin list --json \
@@ -186,6 +219,7 @@ install_claude() {
     echo "Claude did not report $plugin@$marketplace as installed" >&2
     return 1
   fi
+  verify_claude_install
 }
 
 case "$target" in
