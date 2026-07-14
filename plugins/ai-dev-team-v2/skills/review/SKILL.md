@@ -132,10 +132,21 @@ model identity or a silent fallback.
   change. Check whether tests could pass while the requirement remains broken.
   For a bug-fix claim, independently re-derive the failure mechanism from the
   baseline and compare baseline and candidate at the same production-relevant
-  seam, including framework or runtime behavior outside the diff. Treat a test
-  that disables, replaces, or bypasses a load-bearing mechanism in that path as
-  non-discriminating for the affected claim unless equivalence is demonstrated;
-  report the gap instead of accepting green.
+  seam, including framework or runtime behavior outside the diff. Preserve the
+  failure's complete downstream disposition through its final framework or
+  process boundary. A harness that catches the failure before a terminal
+  observer changes an unhandled path and is not an equivalent counterfactual;
+  account for all downstream observers and the signal cardinality. Treat a
+  test that disables, replaces, or bypasses a load-bearing mechanism in that
+  path as non-discriminating for the affected claim unless equivalence is
+  demonstrated; report the gap instead of accepting green.
+- If the reproduced baseline already satisfies the claimed outcome or does not
+  reproduce the reported incident, the candidate is not causal evidence for
+  that bug-fix claim. Do not invent a historical or configuration explanation
+  or silently reclassify the change as hardening to make it acceptable.
+  Withhold acceptance until authoritative evidence establishes the failure
+  mechanism, or the owner explicitly accepts the revised hardening goal and
+  trade-off.
 - Use native review tools and focused verification. Before declaring focused
   tests unavailable, inspect already-ready repo-native runtimes: repository
   instructions and test targets, an existing environment, and an existing

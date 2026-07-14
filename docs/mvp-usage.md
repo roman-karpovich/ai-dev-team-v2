@@ -13,6 +13,14 @@ not mistaken for the implementation repository. Multi-repository outcomes
 must be split into bounded tasks; sibling repositories are never silently
 edited outside the recorded snapshot.
 
+During contract dogfooding, feature throughput is not a success metric. A
+small immutable task or defect may be rerun after a contract change while it
+still distinguishes a trustworthy result from a plausible false green. Each
+run starts from a fresh inference context and the prior result remains hidden
+until the new conclusion is fixed. Seek another task when the existing
+fixtures no longer exercise the uncertainty being reduced, not merely to
+produce novel code.
+
 ## Install
 
 Clone this repository, enter its root, and install both host plugins and the

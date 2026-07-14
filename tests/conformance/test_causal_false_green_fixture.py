@@ -55,6 +55,10 @@ class CausalFalseGreenFixtureTest(unittest.TestCase):
         self.assertEqual("2", self.git("rev-list", "--count", "--all"))
         self.assertEqual(self.base, self.git("rev-parse", f"{self.head}^"))
         self.assertEqual(
+            ["snapshot: candidate", "snapshot: baseline"],
+            self.git("log", "--format=%s", "--all").splitlines(),
+        )
+        self.assertEqual(
             ["REVIEW.md", "listener.py", "runtime.py", "test_listener.py"],
             self.git("ls-tree", "-r", "--name-only", self.head).splitlines(),
         )
@@ -65,6 +69,14 @@ class CausalFalseGreenFixtureTest(unittest.TestCase):
                 for path in self.repository.rglob("*")
             )
         )
+
+        review_brief = (self.repository / "REVIEW.md").read_text()
+        self.assertIn("observable through terminal reporting", review_brief)
+        self.assertNotIn("exactly one terminal report", review_brief)
+
+        oracle = " ".join(ORACLE.read_text().split())
+        self.assertIn("not causal evidence", oracle)
+        self.assertIn("already satisfies", oracle)
 
     def test_green_candidate_test_hides_the_production_regression(self) -> None:
         self.git("checkout", "--quiet", self.head)

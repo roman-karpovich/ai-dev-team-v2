@@ -18,7 +18,7 @@ BASE_FILES = {
 
         Review the candidate commit against this behavior contract:
 
-        - a failed item produces exactly one terminal report;
+        - a failed item is observable through terminal reporting;
         - the same failure reaches the process boundary and exits non-zero;
         - failed processing does not advance the persisted cursor.
 
@@ -173,12 +173,12 @@ def materialize(repository: Path) -> tuple[str, str]:
     write_files(repository, BASE_FILES)
     base = commit(
         repository,
-        "base: existing terminal reporting",
+        "snapshot: baseline",
         "2000-01-01T00:00:00Z",
     )
 
     write_files(repository, CANDIDATE_FILES)
-    head = commit(repository, "fix: report handler failures", "2000-01-01T00:01:00Z")
+    head = commit(repository, "snapshot: candidate", "2000-01-01T00:01:00Z")
     return base, head
 
 
