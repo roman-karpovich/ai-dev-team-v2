@@ -380,6 +380,26 @@ class SkillContractTest(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, self.usage)
 
+    def test_review_rederives_bug_fix_at_the_production_seam(self) -> None:
+        review_work = self.review[
+            self.review.index("## review independently") :
+            self.review.index("## preserve a cold second review")
+        ]
+        self.assertIn(
+            "tests could pass while the requirement remains broken",
+            review_work,
+        )
+        for required in (
+            "independently re-derive the failure mechanism from the baseline",
+            "compare baseline and candidate at the same production-relevant seam",
+            "framework or runtime behavior outside the diff",
+            "disables, replaces, or bypasses a load-bearing mechanism",
+            "non-discriminating",
+            "unless equivalence is demonstrated",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, review_work)
+
     def test_review_reuses_only_ready_focused_test_runtimes(self) -> None:
         for required in (
             "existing local image or container",

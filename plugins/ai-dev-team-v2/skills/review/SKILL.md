@@ -130,6 +130,12 @@ model identity or a silent fallback.
 - Inspect correctness, failure behavior, security and data risks,
   architectural fit, compatibility, and maintainability in proportion to the
   change. Check whether tests could pass while the requirement remains broken.
+  For a bug-fix claim, independently re-derive the failure mechanism from the
+  baseline and compare baseline and candidate at the same production-relevant
+  seam, including framework or runtime behavior outside the diff. Treat a test
+  that disables, replaces, or bypasses a load-bearing mechanism in that path as
+  non-discriminating for the affected claim unless equivalence is demonstrated;
+  report the gap instead of accepting green.
 - Use native review tools and focused verification. Before declaring focused
   tests unavailable, inspect already-ready repo-native runtimes: repository
   instructions and test targets, an existing environment, and an existing
