@@ -70,8 +70,11 @@ subagents, workflows, tools, or project instructions.
      assumption. Re-derive the baseline failure mechanism through its final
      production-relevant observer, including whether and when that observer is
      reachable under relevant concurrency, shutdown, buffering, and framework
-     behavior. Inspect targeted history plus runtime and supervisor
-     configuration before changing that boundary. Do not infer a timing or
+     behavior. Name that observer in the verified facts before implementation.
+     A worker, callback, future, command, or framework boundary is not final
+     when production has a later automatic observer; catching there changes the
+     path. Inspect targeted history plus runtime and supervisor configuration
+     before changing that boundary. Do not infer a timing or
      termination SLA from `fail-fast` or `restart`. New evidence may invalidate
      the plan, but it does not authorize strengthening the owner's contract. A
      fix that bypasses normal stack unwinding or cleanup, or changes the fate of
@@ -181,14 +184,18 @@ subagents, workflows, tools, or project instructions.
   execution evidence, not part of `GOAL`, and requires no new state field.
 
 - For behavior-changing code, prefer a focused failing test first. Reproduce
-  the defect at the closest deterministic production seam. For an incident or
-  bug fix, compare baseline and candidate at the same final observer and
-  preserve the complete downstream disposition, reachability, timing, and
-  signal cardinality. Assert the observable outcome plus relevant persistence,
-  propagation, or process lifecycle. A new mock or log call alone is
-  insufficient evidence when those semantics matter. A test that replaces the
-  mechanism that performs the claimed outcome proves only the local call unless
-  production-equivalent behavior is independently demonstrated.
+  the defect at the narrowest deterministic seam that still includes every
+  load-bearing automatic downstream observer. For an incident or bug fix,
+  compare baseline and candidate at the same final observer and preserve the
+  complete downstream disposition, reachability, timing, and signal
+  cardinality. Assert the observable outcome plus relevant persistence,
+  propagation, or process lifecycle. When signal classification or handled
+  state affects operational behavior, assert it as well as cardinality. A new
+  mock or log call alone is insufficient evidence when those semantics matter.
+  A test that replaces the mechanism that performs the claimed outcome proves
+  only the local call unless production-equivalent behavior is independently
+  demonstrated. A real dependency client remains non-discriminating when its
+  load-bearing hooks or integrations are disabled, replaced, or bypassed.
 - Never copy a secret-bearing `.env` or credential-bearing runtime config into
   another worktree to run a check. Prefer project test fixtures or minimal
   dummy non-secret values, and keep secrets out of tool output and checkpoints.

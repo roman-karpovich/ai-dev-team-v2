@@ -102,12 +102,15 @@ skip, cursor or checkpoint advancement, transaction boundaries, or
 partial-success behavior is normative and never a reversible assumption.
 Re-derive the baseline through the final production-relevant observer,
 including whether and when it is reachable under relevant concurrency,
-shutdown, buffering, and framework behavior. Inspect targeted history plus
-runtime and supervisor configuration first. `Fail-fast` or `restart` does not
-silently define a timing or termination SLA. A fix that bypasses normal stack
-unwinding or cleanup, or changes the fate of sibling work, requires an explicit
-owner decision. If multiple viable contracts remain, present the evidence and
-ask one focused owner decision before starting state or editing.
+shutdown, buffering, and framework behavior, and name that observer in the
+verified facts before implementation. A worker, callback, future, command, or
+framework boundary is not final when production has a later automatic observer;
+catching there changes the path. Inspect targeted history plus runtime and
+supervisor configuration first. `Fail-fast` or `restart` does not silently
+define a timing or termination SLA. A fix that bypasses normal stack unwinding
+or cleanup, or changes the fate of sibling work, requires an explicit owner
+decision. If multiple viable contracts remain, present the evidence and ask one
+focused owner decision before starting state or editing.
 
 Evidence from a sibling repository, ignored symlink target, deployment
 snapshot, or runtime configuration outside the selected worktree is external
@@ -115,14 +118,18 @@ operational evidence. Record its provenance and freshness; it is not a
 verified repository fact from the task snapshot.
 
 For behavior-changing code, prefer a focused failing test first. Reproduce the
-defect at the closest deterministic production seam. For an incident fix,
-compare baseline and candidate at the same final observer, including complete
+defect at the narrowest deterministic seam that still includes every
+load-bearing automatic downstream observer. For an incident fix, compare
+baseline and candidate at the same final observer, including complete
 downstream disposition, reachability, timing, and signal cardinality. Assert
 the observable outcome plus relevant persistence, propagation, or process
-lifecycle. A new mock or log call alone is insufficient evidence when those
-semantics matter; replacing the mechanism that performs the claimed outcome
-proves only the local call unless production-equivalent behavior is separately
-demonstrated.
+lifecycle. When signal classification or handled state affects operational
+behavior, assert it as well as cardinality. A new mock or log call alone is
+insufficient evidence when those semantics matter; replacing the mechanism
+that performs the claimed outcome proves only the local call unless
+production-equivalent behavior is separately demonstrated. A real dependency
+client remains non-discriminating when its load-bearing hooks or integrations
+are disabled, replaced, or bypassed.
 
 A review finding is evidence about the candidate, not authority to enlarge the
 accepted task contract. Before repair, trace it to the accepted outcome or a

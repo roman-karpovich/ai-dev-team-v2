@@ -148,10 +148,13 @@ model identity or a silent fallback.
   eventual behavior after blocked work is released is not equivalent to prompt
   failure handling. A harness that catches the failure before a terminal
   observer changes an unhandled path and is not an equivalent counterfactual;
-  account for all downstream observers and the signal cardinality. Treat a
-  test that disables, replaces, or bypasses a load-bearing mechanism in that
-  path as non-discriminating for the affected claim unless equivalence is
-  demonstrated; report the gap instead of accepting green.
+  account for all downstream observers and the signal cardinality. Compare the
+  signal classification or handled state when it can change alerting or other
+  operational meaning. Treat a test that disables, replaces, or bypasses a
+  load-bearing mechanism in that path as non-discriminating for the affected
+  claim unless equivalence is demonstrated. A real dependency client does not
+  establish equivalence when its load-bearing hooks or integrations are
+  disabled, replaced, or bypassed; report the gap instead of accepting green.
 - If the reproduced baseline already satisfies the claimed outcome or does not
   reproduce the reported incident, the candidate is not causal evidence for
   that bug-fix claim. Do not invent a historical or configuration explanation

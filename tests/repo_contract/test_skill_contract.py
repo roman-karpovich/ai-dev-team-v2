@@ -179,6 +179,9 @@ class SkillContractTest(unittest.TestCase):
             "re-derive the baseline failure mechanism",
             "final production-relevant observer",
             "whether and when that observer is reachable",
+            "name that observer",
+            "worker, callback, future, command, or framework boundary",
+            "production has a later automatic observer",
             "do not infer a timing or termination sla from `fail-fast` or `restart`",
             "normal stack unwinding or cleanup",
             "fate of sibling work",
@@ -194,12 +197,15 @@ class SkillContractTest(unittest.TestCase):
         ]
         for required in (
             "focused failing test first",
-            "closest deterministic production seam",
+            "narrowest deterministic seam that still includes every load-bearing automatic downstream observer",
             "compare baseline and candidate at the same final observer",
             "complete downstream disposition, reachability, timing, and signal cardinality",
+            "signal classification or handled state",
             "persistence, propagation, or process lifecycle",
             "a new mock or log call alone is insufficient evidence",
             "replaces the mechanism that performs the claimed outcome",
+            "real dependency client",
+            "hooks or integrations are disabled",
             "never copy a secret-bearing `.env`",
             "minimal dummy non-secret values",
         ):
@@ -468,6 +474,7 @@ class SkillContractTest(unittest.TestCase):
             "concurrency, shutdown, buffering, and framework lifecycle",
             "catches the failure before a terminal observer",
             "all downstream observers and the signal cardinality",
+            "signal classification or handled state",
             "baseline already satisfies the claimed outcome",
             "does not reproduce the reported incident",
             "do not invent a historical or configuration explanation",
@@ -475,6 +482,8 @@ class SkillContractTest(unittest.TestCase):
             "withhold acceptance",
             "owner explicitly accepts the revised hardening goal and trade-off",
             "disables, replaces, or bypasses a load-bearing mechanism",
+            "real dependency client",
+            "hooks or integrations are disabled",
             "non-discriminating",
             "unless equivalence is demonstrated",
         ):
