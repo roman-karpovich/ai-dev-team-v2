@@ -45,15 +45,53 @@ class SkillContractTest(unittest.TestCase):
             "proposed fixes",
             "expected conclusions",
             "independence-compromised",
-            "/memories",
-            "use of existing memories",
-            "future memory generation",
+            "memories.use_memories=false",
+            "memories.generate_memories=false",
+            "before the session starts",
+            "one-off",
+            "global config",
             "telling the model to ignore",
             "status` is metadata-only",
             "completion summary",
             "re-apply the independence preflight",
             "before resume, takeover, or artifact inspection",
             "repair validation, not a cold review",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.review)
+
+        self.assertNotIn("/memories", self.review)
+
+    def test_reviewer_owns_state_start_after_preflight(self) -> None:
+        for required in (
+            "must not pre-create",
+            "reviewer starts",
+            "after the independence preflight",
+            "retains the returned lease",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.review)
+
+        preflight = self.review.index("## independence preflight")
+        start = self.review.index('adt --workspace "$workspace" start')
+        self.assertLess(preflight, start)
+
+    def test_review_requires_an_explicit_immutable_commit_range(self) -> None:
+        for required in (
+            "resolve `base` and `head` to immutable commit shas",
+            'git diff "$base..$head"',
+            "never silently use `head^`",
+            "explicitly accepts a single-commit scope",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.review)
+
+    def test_review_reuses_only_ready_focused_test_runtimes(self) -> None:
+        for required in (
+            "existing local image or container",
+            "exact focused offline selector",
+            "do not install dependencies, build, or pull",
+            "broad suite or live-network smoke",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, self.review)
@@ -75,9 +113,12 @@ class SkillContractTest(unittest.TestCase):
 
     def test_usage_documents_cold_review_and_repair_lifecycle(self) -> None:
         for required in (
-            "/memories",
-            "use of existing memories",
-            "future memory generation",
+            "memories.use_memories=false",
+            "memories.generate_memories=false",
+            "one-off",
+            "before the session starts",
+            "do not pre-create adt state",
+            "<base>..<head>",
             "exact old and new",
             "superseded source or decision",
             "leave the development task active",
@@ -87,6 +128,8 @@ class SkillContractTest(unittest.TestCase):
         ):
             with self.subTest(required=required):
                 self.assertIn(required, self.usage)
+
+        self.assertNotIn("/memories", self.usage)
 
 
 if __name__ == "__main__":

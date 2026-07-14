@@ -21,12 +21,16 @@ two-model review. Run it before inspecting the artifact or mutating ADT state.
   Prior findings, suspected locations, severities, proposed fixes, or expected
   conclusions contaminate a cold review.
 - If contaminating context is present, stop and label the attempt
-  `independence-compromised`. In Codex, start a new task and use `/memories` to
-  disable both use of existing memories and future memory generation before
-  invoking this skill. On another host, establish the equivalent memory-clean
-  session. If that is impossible, continue only when the user accepts a
-  non-independent validation. Telling the model to ignore contaminated context
-  is insufficient because it has already primed the review.
+  `independence-compromised`. In Codex, launch a replacement as a one-off
+  memory-clean process before the session starts, with
+  `-c 'memories.use_memories=false'` and
+  `-c 'memories.generate_memories=false'`, then invoke this skill. Do not edit
+  global config for a cold review. An in-session setting cannot restore
+  independence after memory has already entered the context. On another host,
+  establish the equivalent memory-clean session. If that is impossible,
+  continue only when the user accepts a non-independent validation. Telling
+  the model to ignore contaminated context is insufficient because it has
+  already primed the review.
 
 ## Connect to the task
 
@@ -39,8 +43,16 @@ two-model review. Run it before inspecting the artifact or mutating ADT state.
    context.
 3. One MVP review covers exactly one Git worktree. If the requested artifact
    spans repositories, split it into bounded reviews and state which combined
-   claim remains outside this MVP's assurance.
-4. Set `WORKSPACE` to the selected target root and run
+   claim remains outside this MVP's assurance. For a committed review, resolve
+   `BASE` and `HEAD` to immutable commit SHAs before creating state, state both
+   values, and put the resolved `$BASE..$HEAD` range in the neutral `GOAL`. If
+   the full-change boundaries are ambiguous, ask the user. Never silently use
+   `HEAD^`; use `HEAD^..HEAD` only when the user explicitly accepts a
+   single-commit scope.
+4. The launcher or user must not pre-create a standalone ADT review task. After
+   the Independence preflight and read-only workspace orientation, the
+   reviewer starts or connects to state itself. Set `WORKSPACE` to the selected
+   target root and run
    `adt --workspace "$WORKSPACE" status`. Save the active task's durable kind
    as `TASK_KIND`; preserve an existing `kind=develop` when review is a handed-
    off phase of that task. `status` is metadata-only: it must omit the goal,
@@ -49,10 +61,11 @@ two-model review. Run it before inspecting the artifact or mutating ADT state.
    `independence-compromised`. If no task exists, or the current task is already
    completed, start a new one with
    `adt --workspace "$WORKSPACE" start --host "$HOST" --kind review --goal "$GOAL"`,
-   set `TASK_KIND` to `review`, and let `GOAL` identify the artifact and review
-   intent. If the invocation explicitly selects `economy`, `balanced`,
-   `critical`, or `manual`, append `--profile "$PROFILE"`; otherwise keep the
-   balanced default.
+   set `TASK_KIND` to `review`; the reviewer retains the returned lease as
+   `LEASE`. The reviewer starts only after the preflight and lets `GOAL`
+   identify the artifact, resolved range, and review intent. If the invocation
+   explicitly selects `economy`, `balanced`, `critical`, or `manual`, append
+   `--profile "$PROFILE"`; otherwise keep the balanced default.
 5. For a cold or independent review of an existing open task, run
    `adt --workspace "$WORKSPACE" context` read-only before resume, takeover, or
    artifact inspection. Re-apply the Independence preflight to that payload.
@@ -78,13 +91,20 @@ two-model review. Run it before inspecting the artifact or mutating ADT state.
 ## Review independently
 
 - Use the original goal, accepted requirements, current repository state, and
-  actual diff as the review basis. In a cold review, use a fresh host session
-  and do not seek the builder's transcript or another reviewer's conclusions.
+  actual diff as the review basis. For a committed range, inspect the commit
+  list and `git diff "$BASE..$HEAD"`; do not substitute the latest commit for
+  the accepted scope. In a cold review, use a fresh host session and do not
+  seek the builder's transcript or another reviewer's conclusions.
 - Inspect correctness, failure behavior, security and data risks,
   architectural fit, compatibility, and maintainability in proportion to the
   change. Check whether tests could pass while the requirement remains broken.
-- Use native review tools and focused verification. Do not run a slow broad
-  suite unless the affected behavior or a release gate requires it.
+- Use native review tools and focused verification. Before declaring focused
+  tests unavailable, inspect already-ready repo-native runtimes: repository
+  instructions and test targets, an existing environment, and an existing
+  local image or container. If one can run the exact focused offline selector,
+  use it. Do not install dependencies, build, or pull merely to fill a review
+  gap. This bounded discovery does not authorize a broad suite or live-network
+  smoke; report the exact residual coverage gap if no ready runtime works.
 - Do not modify code unless the user explicitly requests review-and-repair.
   Keep findings independent before beginning any repair.
 - Report actionable findings first, ordered by severity. Give a precise

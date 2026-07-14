@@ -59,13 +59,32 @@ The skill starts or resumes the workspace task and then lets Codex use its
 normal dialogue, planning, subagents, tools, and focused verification. Ordinary
 coding requests do not opt into AI Dev Team state.
 
-For a standalone cold review, open a fresh Codex task. Run `/memories` first
-and disable both use of existing memories and future memory generation before
-invoking:
+For a standalone cold review, use a one-off Codex CLI launch that disables both
+memory directions before the session starts. It does not edit global config.
+For a linked worktree, the narrow additional writable root lets ADT update its
+own ledger without granting the whole common Git directory:
+
+```bash
+WORKSPACE=/path/to/worktree
+ADT_STATE_ROOT="$(git -C "$WORKSPACE" rev-parse --path-format=absolute --git-common-dir)/ai-dev-team"
+codex -C "$WORKSPACE" \
+  --add-dir "$ADT_STATE_ROOT" \
+  -c 'memories.use_memories=false' \
+  -c 'memories.generate_memories=false'
+```
+
+Do not pre-create ADT state for a standalone cold review. The reviewer performs
+the independence preflight, resolves the review scope, and starts its own task.
+Then invoke it with an explicit full feature range:
 
 ```text
-$ai-dev-team:review Review the current branch against its stated goal.
+$ai-dev-team:review Review <BASE>..<HEAD> against its stated goal.
 ```
+
+Use `HEAD^..HEAD` only when the accepted scope is explicitly one commit. Before
+reporting focused tests as unavailable, the reviewer checks already-ready local
+repo runtimes, including an existing image or container; it does not install,
+build, pull, or widen the run to broad or live-network smoke for that purpose.
 
 ## Start in Claude Code
 
@@ -78,7 +97,7 @@ Start Claude Code in the target repository and invoke the namespaced skill:
 Claude remains free to use its native workflows and subagents. For review:
 
 ```text
-/ai-dev-team:review Review the current branch against its stated goal.
+/ai-dev-team:review Review <BASE>..<HEAD> against its stated goal.
 ```
 
 ## Hand off between hosts
@@ -122,11 +141,10 @@ manual:
    suspected files, severities, or fixes.
 3. Hand off and open a fresh session in provider B. Before inspecting the
    artifact, check the context already supplied by the host for prior findings,
-   suspected locations, severities, fixes, or expected conclusions. In Codex,
-   run `/memories` and disable both use of existing memories and future memory
-   generation before invoking its review skill. The skill performs the same
-   check on any existing ADT context before resume. Do not paste A's output into
-   the session.
+   suspected locations, severities, fixes, or expected conclusions. For Codex,
+   use the same one-off CLI launch above so both memory settings are disabled
+   before the session starts. The skill performs the same check on any existing
+   ADT context before resume. Do not paste A's output into the session.
 4. Let B state and checkpoint its own conclusions.
 5. Only after B's report is fixed, compare the two reports and adjudicate
    disagreements from repository evidence.

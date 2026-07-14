@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import fcntl
+import importlib.util
 import json
+import stat
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -38,7 +42,11 @@ class AdtCliTest(unittest.TestCase):
         )
 
     def _adt(
-        self, *args: str, expected_code: int = 0, cwd: Path | None = None
+        self,
+        *args: str,
+        expected_code: int = 0,
+        cwd: Path | None = None,
+        timeout: float | None = None,
     ) -> tuple[dict[str, object], subprocess.CompletedProcess[str]]:
         result = subprocess.run(
             [sys.executable, str(ADT), *args],
@@ -46,6 +54,7 @@ class AdtCliTest(unittest.TestCase):
             check=False,
             text=True,
             capture_output=True,
+            timeout=timeout,
         )
         self.assertEqual(
             expected_code,
@@ -121,6 +130,62 @@ class AdtCliTest(unittest.TestCase):
             expected_code=3,
         )
         self.assertEqual("task_open", error["error"]["code"])
+
+    def test_status_context_and_list_use_read_only_shared_lock(self) -> None:
+        self._start()
+        state_path, state = self._stored_state()
+        lock_path = state_path.with_name("state.lock")
+        state_before = state_path.read_bytes()
+
+        lock_path.chmod(0o400)
+        lock_mode_before = stat.S_IMODE(lock_path.stat().st_mode)
+        lock_mtime_before = lock_path.stat().st_mtime_ns
+        lock_mode_after = None
+        lock_mtime_after = None
+        try:
+            with lock_path.open("rb") as held_lock:
+                fcntl.flock(held_lock.fileno(), fcntl.LOCK_SH)
+                try:
+                    for command in ("status", "context", "list"):
+                        with self.subTest(command=command):
+                            payload, _ = self._adt(command, timeout=2)
+                            self.assertTrue(payload["ok"])
+                finally:
+                    fcntl.flock(held_lock.fileno(), fcntl.LOCK_UN)
+            lock_mode_after = stat.S_IMODE(lock_path.stat().st_mode)
+            lock_mtime_after = lock_path.stat().st_mtime_ns
+        finally:
+            lock_path.chmod(0o600)
+
+        self.assertEqual(state_before, state_path.read_bytes())
+        self.assertEqual(state["revision"], self._stored_state()[1]["revision"])
+        self.assertEqual(lock_mode_before, lock_mode_after)
+        self.assertEqual(lock_mtime_before, lock_mtime_after)
+
+    def test_mutation_lock_remains_exclusive(self) -> None:
+        spec = importlib.util.spec_from_file_location("adt_under_test", ADT)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        runtime = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = runtime
+        spec.loader.exec_module(runtime)
+
+        workspace = runtime.GitWorkspace(
+            root=self.repo,
+            common_dir=self.repo / ".git",
+            workspace_id="lock-contract",
+        )
+        store = runtime.StateStore(workspace)
+
+        with mock.patch.object(runtime.fcntl, "flock") as flock:
+            with store.lock():
+                pass
+            self.assertEqual(fcntl.LOCK_EX, flock.call_args_list[0].args[1])
+
+        with mock.patch.object(runtime.fcntl, "flock") as flock:
+            with store.lock(shared=True):
+                pass
+            self.assertEqual(fcntl.LOCK_SH, flock.call_args_list[0].args[1])
 
     def test_start_records_explicit_kind_and_profile_without_routing(self) -> None:
         payload, _ = self._adt(

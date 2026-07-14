@@ -84,11 +84,16 @@ class StateStore:
         self.lock_path = self.directory / "state.lock"
 
     @contextlib.contextmanager
-    def lock(self) -> Iterator[None]:
-        self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-        with self.lock_path.open("a+b") as lock_file:
-            os.chmod(self.lock_path, 0o600)
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+    def lock(self, *, shared: bool = False) -> Iterator[None]:
+        if not shared:
+            self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+        with self.lock_path.open("rb" if shared else "a+b") as lock_file:
+            if not shared:
+                os.chmod(self.lock_path, 0o600)
+            fcntl.flock(
+                lock_file.fileno(),
+                fcntl.LOCK_SH if shared else fcntl.LOCK_EX,
+            )
             try:
                 yield
             finally:
@@ -599,7 +604,7 @@ def command_status(
 ) -> dict[str, Any]:
     if not store.state_path.exists():
         raise CliError("no_task", "No task state exists in this workspace.")
-    with store.lock():
+    with store.lock(shared=True):
         state_value = _load_existing(store)
         task = _current_task(state_value)
         live_snapshot = capture_snapshot(workspace)
@@ -622,7 +627,7 @@ def command_status(
 def command_list(workspace: GitWorkspace, store: StateStore) -> dict[str, Any]:
     if not store.state_path.exists():
         return _success("list", workspace, revision=0, current_task_id=None, tasks=[])
-    with store.lock():
+    with store.lock(shared=True):
         state_value = _load_existing(store)
         summaries = [
             {
