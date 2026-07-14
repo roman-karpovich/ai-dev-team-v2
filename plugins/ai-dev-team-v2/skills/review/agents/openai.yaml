@@ -1,0 +1,6 @@
+interface:
+  display_name: "Trusted Review"
+  short_description: "Run an independent evidence-based code review"
+  default_prompt: "Use $ai-dev-team:review to inspect this change against its intent and evidence."
+policy:
+  allow_implicit_invocation: false

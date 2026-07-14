@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.schema.json",
+  "name": "ai-dev-team-v2-local",
+  "owner": {
+    "name": "AI Dev Team contributors"
+  },
+  "description": "Local development marketplace for AI Dev Team v2.",
+  "plugins": [
+    {
+      "name": "ai-dev-team",
+      "source": "./plugins/ai-dev-team-v2",
+      "description": "Controlled, resumable development and evidence-based review across native coding hosts.",
+      "version": "0.1.2",
+      "author": {
+        "name": "AI Dev Team contributors"
+      },
+      "category": "Development",
+      "tags": [
+        "development",
+        "review",
+        "handoff"
+      ],
+      "strict": true
+    }
+  ]
+}

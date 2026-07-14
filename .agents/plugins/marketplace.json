@@ -1,0 +1,20 @@
+{
+  "name": "ai-dev-team-v2-local",
+  "interface": {
+    "displayName": "AI Dev Team v2 Local"
+  },
+  "plugins": [
+    {
+      "name": "ai-dev-team",
+      "source": {
+        "source": "local",
+        "path": "./plugins/ai-dev-team-v2"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

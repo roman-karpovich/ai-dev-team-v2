@@ -1,0 +1,231 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+marketplace="ai-dev-team-v2-local"
+plugin="ai-dev-team"
+plugin_dir="ai-dev-team-v2"
+legacy_marketplace="ai-dev-team"
+legacy_plugin="$plugin@$legacy_marketplace"
+target="--all"
+replace_v1=false
+
+for argument in "$@"; do
+  case "$argument" in
+    --all|--codex|--claude)
+      target="$argument"
+      ;;
+    --replace-v1)
+      replace_v1=true
+      ;;
+    *)
+      echo "usage: scripts/install-mvp [--all|--codex|--claude] [--replace-v1]" >&2
+      exit 2
+      ;;
+  esac
+done
+
+install_cli() {
+  local source="$repo_root/plugins/$plugin_dir/bin/adt"
+  local destination="$HOME/.local/bin/adt"
+
+  if [[ ! -x "$source" ]]; then
+    echo "missing executable: $source" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$destination")"
+
+  if [[ -e "$destination" || -L "$destination" ]]; then
+    if [[ ! -L "$destination" || "$(readlink "$destination")" != "$source" ]]; then
+      echo "refusing to replace existing path: $destination" >&2
+      echo "move or remove it explicitly, then rerun the installer" >&2
+      return 1
+    fi
+  fi
+
+  ln -sfn "$source" "$destination"
+}
+
+has_codex_marketplace() {
+  has_codex_marketplace_name "$marketplace"
+}
+
+has_codex_marketplace_name() {
+  local name="$1"
+  codex plugin marketplace list \
+    | awk 'NR > 1 { print $1 }' \
+    | grep -Fxq "$name"
+}
+
+has_claude_marketplace() {
+  claude plugin marketplace list --json \
+    | python3 -c '
+import json
+import sys
+
+name = sys.argv[1]
+items = json.load(sys.stdin)
+raise SystemExit(0 if any(item.get("name") == name for item in items) else 1)
+' "$marketplace"
+}
+
+has_claude_plugin() {
+  local plugin_id="${1:-$plugin@$marketplace}"
+  claude plugin list --json \
+    | python3 -c '
+import json
+import sys
+
+plugin_id = sys.argv[1]
+items = json.load(sys.stdin)
+raise SystemExit(0 if any(item.get("id") == plugin_id for item in items) else 1)
+' "$plugin_id"
+}
+
+has_codex_plugin() {
+  local plugin_id="${1:-$plugin@$marketplace}"
+  codex plugin list --json \
+    | python3 -c '
+import json
+import sys
+
+plugin_id = sys.argv[1]
+items = json.load(sys.stdin).get("installed", [])
+raise SystemExit(0 if any(item.get("pluginId") == plugin_id for item in items) else 1)
+' "$plugin_id"
+}
+
+has_claude_marketplace_name() {
+  local name="$1"
+  claude plugin marketplace list --json \
+    | python3 -c '
+import json
+import sys
+
+name = sys.argv[1]
+items = json.load(sys.stdin)
+raise SystemExit(0 if any(item.get("name") == name for item in items) else 1)
+' "$name"
+}
+
+guard_codex_migration() {
+  if has_codex_plugin "$legacy_plugin" || has_codex_marketplace_name "$legacy_marketplace"; then
+    if [[ "$replace_v1" != true ]]; then
+      echo "v1 is still configured as $legacy_plugin" >&2
+      echo "rerun with --replace-v1 to replace it explicitly" >&2
+      return 1
+    fi
+  fi
+  return 0
+}
+
+guard_claude_migration() {
+  if has_claude_plugin "$legacy_plugin" || has_claude_marketplace_name "$legacy_marketplace"; then
+    if [[ "$replace_v1" != true ]]; then
+      echo "v1 is still configured as $legacy_plugin" >&2
+      echo "rerun with --replace-v1 to replace it explicitly" >&2
+      return 1
+    fi
+  fi
+  return 0
+}
+
+remove_codex_v1() {
+  [[ "$replace_v1" == true ]] || return 0
+  if has_codex_plugin "$legacy_plugin"; then
+    codex plugin remove "$legacy_plugin"
+  fi
+  if has_codex_marketplace_name "$legacy_marketplace"; then
+    codex plugin marketplace remove "$legacy_marketplace"
+  fi
+  return 0
+}
+
+remove_claude_v1() {
+  [[ "$replace_v1" == true ]] || return 0
+  if has_claude_plugin "$legacy_plugin"; then
+    claude plugin uninstall -y "$legacy_plugin"
+  fi
+  if has_claude_marketplace_name "$legacy_marketplace"; then
+    claude plugin marketplace remove "$legacy_marketplace"
+  fi
+  return 0
+}
+
+install_codex() {
+  command -v codex >/dev/null 2>&1 || {
+    echo "codex is not installed" >&2
+    return 1
+  }
+
+  if ! has_codex_marketplace; then
+    codex plugin marketplace add "$repo_root"
+  fi
+  codex plugin add "$plugin@$marketplace"
+  if ! has_codex_plugin "$plugin@$marketplace"; then
+    echo "Codex did not report $plugin@$marketplace as installed" >&2
+    return 1
+  fi
+}
+
+install_claude() {
+  command -v claude >/dev/null 2>&1 || {
+    echo "claude is not installed" >&2
+    return 1
+  }
+
+  if ! has_claude_marketplace; then
+    claude plugin marketplace add "$repo_root"
+  fi
+  if has_claude_plugin "$plugin@$marketplace"; then
+    claude plugin update "$plugin@$marketplace"
+  else
+    claude plugin install "$plugin@$marketplace"
+  fi
+  if ! has_claude_plugin "$plugin@$marketplace"; then
+    echo "Claude did not report $plugin@$marketplace as installed" >&2
+    return 1
+  fi
+}
+
+case "$target" in
+  --all)
+    command -v codex >/dev/null 2>&1 || {
+      echo "codex is not installed" >&2
+      exit 1
+    }
+    command -v claude >/dev/null 2>&1 || {
+      echo "claude is not installed" >&2
+      exit 1
+    }
+    guard_codex_migration
+    guard_claude_migration
+    install_cli
+    install_codex
+    install_claude
+    remove_codex_v1
+    remove_claude_v1
+    ;;
+  --codex)
+    command -v codex >/dev/null 2>&1 || {
+      echo "codex is not installed" >&2
+      exit 1
+    }
+    guard_codex_migration
+    install_cli
+    install_codex
+    remove_codex_v1
+    ;;
+  --claude)
+    command -v claude >/dev/null 2>&1 || {
+      echo "claude is not installed" >&2
+      exit 1
+    }
+    guard_claude_migration
+    install_cli
+    install_claude
+    remove_claude_v1
+    ;;
+esac
+
+echo "Installed $plugin. Start a new Codex task or Claude session before testing."

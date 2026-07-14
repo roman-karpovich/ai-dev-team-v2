@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "ai-dev-team",
+  "displayName": "AI Dev Team",
+  "version": "0.1.2",
+  "description": "Run controlled, resumable development and evidence-based review from Claude Code.",
+  "author": {
+    "name": "AI Dev Team contributors"
+  },
+  "homepage": "https://github.com/roman-karpovich/ai-dev-team-v2/blob/main/docs/mvp-usage.md",
+  "repository": "https://github.com/roman-karpovich/ai-dev-team-v2",
+  "keywords": [
+    "development",
+    "review",
+    "handoff",
+    "verification"
+  ],
+  "skills": "./skills/"
+}
