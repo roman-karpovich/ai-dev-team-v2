@@ -86,6 +86,26 @@ class SkillContractTest(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, self.review)
 
+    def test_review_brief_preserves_requirement_supersession(self) -> None:
+        for required in (
+            "known owner supersessions",
+            "authoritative owner",
+            "exact old and new requirement or value",
+            "superseded source or decision",
+            "do not infer authority from a builder commit message",
+            "do not invent precedence",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.review)
+
+        for required in (
+            "known owner supersessions",
+            "exact old and new requirement or value",
+            "superseded source or decision",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, self.usage)
+
     def test_review_reuses_only_ready_focused_test_runtimes(self) -> None:
         for required in (
             "existing local image or container",

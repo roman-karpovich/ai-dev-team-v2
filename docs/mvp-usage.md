@@ -75,10 +75,14 @@ codex -C "$WORKSPACE" \
 
 Do not pre-create ADT state for a standalone cold review. The reviewer performs
 the independence preflight, resolves the review scope, and starts its own task.
-Then invoke it with an explicit full feature range:
+The invocation is the neutral review brief. When known owner supersessions
+exist, include the authoritative owner, the exact old and new requirement or
+value, the superseded source or decision, and any remaining open decision. Do
+not call an older source authoritative by itself. Then invoke the reviewer with
+an explicit full feature range:
 
 ```text
-$ai-dev-team:review Review <BASE>..<HEAD> against its stated goal.
+$ai-dev-team:review Review <BASE>..<HEAD> against the current accepted requirements. Owner decision: <old requirement> was superseded by <new requirement>.
 ```
 
 Use `HEAD^..HEAD` only when the accepted scope is explicitly one commit. Before
@@ -137,8 +141,8 @@ manual:
 1. Ask reviewer A to inspect the authoritative intent, snapshot, and diff.
 2. Keep A's findings in that native session. Before handoff, write only a
    neutral checkpoint containing the intent, exact scope and snapshot,
-   acceptance criteria, and permitted checks. Do not include findings,
-   suspected files, severities, or fixes.
+   acceptance criteria, known owner supersessions, and permitted checks. Do not
+   include findings, suspected files, severities, or fixes.
 3. Hand off and open a fresh session in provider B. Before inspecting the
    artifact, check the context already supplied by the host for prior findings,
    suspected locations, severities, fixes, or expected conclusions. For Codex,

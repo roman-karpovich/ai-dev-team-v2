@@ -43,12 +43,17 @@ two-model review. Run it before inspecting the artifact or mutating ADT state.
    context.
 3. One MVP review covers exactly one Git worktree. If the requested artifact
    spans repositories, split it into bounded reviews and state which combined
-   claim remains outside this MVP's assurance. For a committed review, resolve
-   `BASE` and `HEAD` to immutable commit SHAs before creating state, state both
-   values, and put the resolved `$BASE..$HEAD` range in the neutral `GOAL`. If
-   the full-change boundaries are ambiguous, ask the user. Never silently use
-   `HEAD^`; use `HEAD^..HEAD` only when the user explicitly accepts a
-   single-commit scope.
+   claim remains outside this MVP's assurance. Carry all known owner
+   supersessions in the neutral `GOAL`: identify the authoritative owner, the
+   exact old and new requirement or value, the superseded source or decision,
+   and any remaining open owner decision. Do not infer authority from a builder
+   commit message. If supplied requirement sources conflict and no
+   authoritative owner decision resolves them, stop and ask the user; do not
+   invent precedence. For a committed review, resolve `BASE` and `HEAD` to
+   immutable commit SHAs before creating state, state both values, and put the
+   resolved `$BASE..$HEAD` range in the neutral `GOAL`. If the full-change
+   boundaries are ambiguous, ask the user. Never silently use `HEAD^`; use
+   `HEAD^..HEAD` only when the user explicitly accepts a single-commit scope.
 4. The launcher or user must not pre-create a standalone ADT review task. After
    the Independence preflight and read-only workspace orientation, the
    reviewer starts or connects to state itself. Set `WORKSPACE` to the selected
@@ -120,9 +125,10 @@ protocol:
    of `adt` state and do not pass them, suspected locations, severities, or
    proposed fixes to reviewer B.
 2. Before handoff, record only a neutral note containing authoritative intent,
-   exact scope and snapshot, accepted criteria, and permitted checks. Then use
-   `handoff --host "$HOST" --lease "$LEASE" --to "$OTHER_HOST"`. Tell the user not to copy A's
-   findings into the next session.
+   known owner supersessions, exact scope and snapshot, accepted criteria, and
+   permitted checks. Then use
+   `handoff --host "$HOST" --lease "$LEASE" --to "$OTHER_HOST"`. Tell the user
+   not to copy A's findings into the next session.
 3. Start a fresh session in host B and run the Independence preflight before
    invoking this skill. B reads the neutral context and commits its own findings
    before seeing A's conclusions. If A's findings leaked into context, stop and
