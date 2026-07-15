@@ -103,19 +103,32 @@ partial-success behavior is normative and never a reversible assumption.
 Re-derive the baseline through the final production-relevant observer,
 including whether and when it is reachable under relevant concurrency,
 shutdown, buffering, and framework behavior, and name that observer in the
-verified facts before implementation. A worker, callback, future, command, or
-framework boundary is not final when production has a later automatic observer;
-catching there changes the path. Inspect targeted history plus runtime and
-supervisor configuration first. `Fail-fast` or `restart` does not silently
-define a timing or termination SLA. A fix that bypasses normal stack unwinding
-or cleanup, or changes the fate of sibling work, requires an explicit owner
-decision. If multiple viable contracts remain, present the evidence and ask one
-focused owner decision before starting state or editing.
+verified facts before implementation. When the claimed outcome depends on
+runtime reporting, propagation, lifecycle, or cardinality, run a safe focused
+baseline probe through that exact route before starting state or editing.
+Naming a destination or reasoning from source is not a substitute for an
+available probe. If the probe is unavailable or does not reproduce the
+incident, mark the causal mechanism unverified and ask the owner to choose
+between further investigation and an explicitly revised hardening goal before
+source edits. A worker, callback, future, command, or framework boundary is not
+final when production has a later automatic observer; catching there changes
+the path. Inspect targeted history plus runtime and supervisor configuration
+first. `Fail-fast` or `restart` does not silently define a timing or termination
+SLA. A fix that bypasses normal stack unwinding or cleanup, or changes the fate
+of sibling work, requires an explicit owner decision. If multiple viable
+contracts remain, present the evidence and ask one focused owner decision
+before starting state or editing.
 
 Evidence from a sibling repository, ignored symlink target, deployment
 snapshot, or runtime configuration outside the selected worktree is external
 operational evidence. Record its provenance and freshness; it is not a
 verified repository fact from the task snapshot.
+
+Use `verified` only for facts directly observed in the selected snapshot or
+demonstrated by concrete inspected repository and applicable runtime evidence.
+Counterfactual claims about concurrency, shutdown, buffering, reporting loss,
+or sibling fate remain assumptions until exercised; they cannot justify source
+edits or expand observable success.
 
 For behavior-changing code, prefer a focused failing test first. Reproduce the
 defect at the narrowest deterministic seam that still includes every
@@ -131,6 +144,15 @@ production-equivalent behavior is separately demonstrated. A real dependency
 client remains non-discriminating when its load-bearing hooks or integrations
 are disabled, replaced, or bypassed.
 
+When a candidate adds reporting while the same failure still reaches automatic
+reporting, enumerate every enabled route, including direct SDK calls, logging
+integrations, framework hooks, and process hooks. Drive the production entry
+point through the terminal process boundary with production-equivalent hooks;
+a fake or in-memory transport is sufficient. Assert exact aggregate event
+cardinality plus propagation or exit. A real client around a directly invoked
+handler, `>= 1`, non-empty, and per-route call assertions prove only partial
+observability.
+
 A review finding is evidence about the candidate, not authority to enlarge the
 accepted task contract. Before repair, trace it to the accepted outcome or a
 repository constraint. An adjacent guarantee requires an owner decision. If an
@@ -144,6 +166,13 @@ Never copy a secret-bearing `.env` or credential-bearing runtime config into a
 worktree to run a check. Use project fixtures or minimal dummy non-secret
 values, keep secrets out of tool output, and report the check as blocked when
 no safe focused setup exists.
+
+Before reporting focused verification as blocked or settling for syntax-only
+checks, inspect already-ready repo-native runtimes: documented test targets, an
+existing environment associated with another checkout of the same repository,
+or an existing local image or container. Use one only when it runs the exact
+focused offline selector against the selected worktree's source without
+copying secrets or mutable runtime state.
 
 Before asking to commit or open a PR, the builder always states whether
 independent review ran. Missing review blocks completion only when the selected
