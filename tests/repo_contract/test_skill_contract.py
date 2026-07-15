@@ -378,6 +378,21 @@ class SkillContractTest(unittest.TestCase):
                 with self.subTest(surface=surface_name, required=required):
                     self.assertIn(required, surface)
 
+    def test_develop_requires_observer_negative_control_before_freeze(self) -> None:
+        verification = self.develop[
+            self.develop.index("for behavior-changing code") :
+            self.develop.index("run the smallest relevant verification once")
+        ]
+        for required in (
+            "before freezing a candidate",
+            "proof harness depends on a load-bearing observer",
+            "safe test-only negative-control mutation",
+            "disables, replaces, or bypasses that observer",
+            "confirm the claimed-outcome assertion fails",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, verification)
+
     def test_develop_and_review_search_ready_runtime_before_syntax_only_fallback(self) -> None:
         for surface in (self.develop, self.review):
             for required in (

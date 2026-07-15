@@ -287,6 +287,10 @@ subagents, workflows, tools, or project instructions.
   only the local call unless production-equivalent behavior is independently
   demonstrated. A real dependency client remains non-discriminating when its
   load-bearing hooks or integrations are disabled, replaced, or bypassed.
+  Before freezing a candidate, when its proof harness depends on a load-bearing
+  observer, run a safe test-only negative-control mutation that disables,
+  replaces, or bypasses that observer and confirm the claimed-outcome assertion
+  fails.
   When one-time process-global initialization installs a load-bearing observer,
   prove at the measurement point that the observer is active and that the
   trigger reaches it; a successful initialization call or initialized registry
