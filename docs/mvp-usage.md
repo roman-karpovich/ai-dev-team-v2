@@ -148,11 +148,14 @@ no safe focused setup exists.
 Before asking to commit or open a PR, the builder always states whether
 independent review ran. Missing review blocks completion only when the selected
 assurance profile, accepted task contract, or owner requires it. In that case
-the result is an implementation checkpoint and the existing manual handoff
-flow supplies the fresh review invocation when the owner requests review.
-Otherwise completion may proceed after proportionate verification while
-disclosing that review did not run. Green tests or a builder checkpoint must
-not imply independent acceptance.
+the result is an implementation checkpoint and the development task remains
+active. Freeze the candidate as an immutable range and supply an invocation for
+a fresh memory-clean session in a separate review checkout that exposes the
+same immutable range. The cold reviewer must stop before reading `context` from
+the open development task and instead start a standalone `kind=review` task
+with a neutral `GOAL`. Otherwise completion may proceed after proportionate
+verification while disclosing that review did not run. Green tests or a
+builder checkpoint must not imply independent acceptance.
 
 When the accepted task contract or owner requires a trusted, full-cycle, or
 two-model result, one reviewer is insufficient. Required independent paths
@@ -255,11 +258,14 @@ Claude remains free to use its native workflows and subagents. For review:
 
 ## Hand off between hosts
 
-Handoff is deliberately manual in the MVP. Ask the current host to create a
-checkpoint and hand the task to the other host. For example:
+Handoff is deliberately manual in the MVP. Use it to transfer task continuity
+or request non-cold validation. It is not the path from an implementation
+checkpoint to a cold review; that path uses the separate standalone review
+checkout described above. Ask the current host to create a checkpoint and hand
+the task to the other host. For example:
 
 ```text
-Checkpoint the current increment and hand it to Claude for an independent review.
+Checkpoint the current increment and hand it to Claude to continue the task.
 ```
 
 When an owner changed a requirement, the checkpoint identifies the
@@ -271,7 +277,7 @@ Then close or leave the current session, open a fresh Claude Code session in
 the same repository, and run:
 
 ```text
-/ai-dev-team:review Review the handed-off implementation independently.
+/ai-dev-team:develop Continue the handed-off task from its checkpoint.
 ```
 
 The reverse direction works the same way: ask Claude to hand off to Codex,
@@ -281,6 +287,8 @@ then open a fresh Codex task and invoke `$ai-dev-team:develop` or
 The plugin never launches the other provider automatically. This keeps quota,
 permissions, native UX, and the point of human control visible. A handoff moves
 durable task context, not hidden reasoning or a provider transcript.
+Reviewer-to-reviewer handoff of an existing open `kind=review` remains valid
+under the cold-review embargo below.
 
 ## Run a two-model cold review
 

@@ -95,19 +95,25 @@ model identity or a silent fallback.
    reviewer starts or connects to state itself. Set `WORKSPACE` to the selected
    target root and run
    `adt --workspace "$WORKSPACE" status`. Save the active task's durable kind
-   as `TASK_KIND`; preserve an existing `kind=develop` when review is a handed-
-   off phase of that task. `status` is metadata-only: it must omit the goal,
-   checkpoint notes, and completion summary. If a cold review receives any of
-   them from `status`, stop as
-   `independence-compromised`. If no task exists, or the current task is already
-   completed, start a new one with
+   as `TASK_KIND`. For a cold review, if `status` reports an open
+   `kind=develop`, stop before reading `context`; do not resume or hand off that
+   task as cold-review context. Require a separate review checkout that exposes
+   the same immutable range, then use a fresh memory-clean session whose
+   reviewer starts a standalone `kind=review` task with a neutral `GOAL`. An
+   existing open `kind=review` may still use reviewer-to-reviewer handoff under
+   the review embargo. Preserve `TASK_KIND=develop` only for explicitly
+   non-cold review or repair validation of a handed-off development task.
+   `status` is metadata-only: it must omit the goal, checkpoint notes, and
+   completion summary. If a cold review receives any of them from `status`,
+   stop as `independence-compromised`. If no task exists, or the current task is
+   already completed, start a new one with
    `adt --workspace "$WORKSPACE" start --host "$HOST" --kind review --goal "$GOAL"`,
    set `TASK_KIND` to `review`; the reviewer retains the returned lease as
    `LEASE`. The reviewer starts only after the preflight and lets `GOAL`
    identify the artifact, resolved range, and review intent. If the invocation
    explicitly selects `economy`, `balanced`, `critical`, or `manual`, append
    `--profile "$PROFILE"`; otherwise keep the balanced default.
-5. For a cold or independent review of an existing open task, run
+5. For a cold or independent review of an existing open `kind=review` task, run
    `adt --workspace "$WORKSPACE" context` read-only before resume, takeover, or
    artifact inspection. Re-apply the Independence preflight to that payload.
    Stop as `independence-compromised` if its goal or checkpoints disclose prior

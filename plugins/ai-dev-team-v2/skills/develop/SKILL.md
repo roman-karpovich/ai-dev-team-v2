@@ -224,11 +224,15 @@ subagents, workflows, tools, or project instructions.
 - Before asking to commit or open a PR, always state whether independent review
   ran. Missing review blocks completion only when the selected assurance
   profile, accepted task contract, or owner requires it. In that case call the
-  result an implementation checkpoint, keep the task active, and, when the
-  owner requests the manual review, use the handoff flow above and give the
-  exact fresh review invocation. Otherwise completion may proceed after
-  proportionate verification while disclosing that review did not run. Green
-  tests or a builder checkpoint must not imply independent acceptance.
+  result an implementation checkpoint and keep the task active. Freeze the
+  candidate as an immutable range and give the exact invocation for a fresh
+  memory-clean session in a separate review checkout that exposes the same
+  immutable range. There the reviewer starts a standalone `kind=review` task
+  with a neutral `GOAL`; do not hand off or resume the open development task as
+  cold-review context. Ordinary handoff remains available for continuity or
+  non-cold validation. Otherwise completion may proceed after proportionate
+  verification while disclosing that review did not run. Green tests or a
+  builder checkpoint must not imply independent acceptance.
 - When the accepted task contract or owner requires a trusted, full-cycle, or
   two-model result, one reviewer is insufficient. The required independent
   paths must form conclusions before disclosure, and any material disagreement

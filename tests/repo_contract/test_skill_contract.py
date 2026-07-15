@@ -227,6 +227,46 @@ class SkillContractTest(unittest.TestCase):
         ):
             self.assertIn(required, boundary)
 
+    def test_implementation_checkpoint_uses_standalone_cold_review_state(self) -> None:
+        develop_boundary = self.develop[self.develop.index("before asking to commit") :]
+        for required in (
+            "implementation checkpoint",
+            "separate review checkout",
+            "same immutable range",
+            "standalone `kind=review`",
+            "neutral `goal`",
+        ):
+            with self.subTest(surface="develop", required=required):
+                self.assertIn(required, develop_boundary)
+
+        review_connection = self.review[
+            self.review.index("## connect to the task") :
+            self.review.index("## review independently")
+        ]
+        for required in (
+            "open `kind=develop`",
+            "stop before reading `context`",
+            "separate review checkout",
+            "same immutable range",
+            "standalone `kind=review`",
+            "neutral `goal`",
+            "existing open `kind=review`",
+            "reviewer-to-reviewer",
+        ):
+            with self.subTest(surface="review", required=required):
+                self.assertIn(required, review_connection)
+
+        for required in (
+            "implementation checkpoint",
+            "stop before reading `context`",
+            "separate review checkout",
+            "same immutable range",
+            "standalone `kind=review`",
+            "neutral `goal`",
+        ):
+            with self.subTest(surface="usage", required=required):
+                self.assertIn(required, self.usage)
+
     def test_builder_subagents_are_advisory_not_independent_paths(self) -> None:
         boundary = self.develop[self.develop.index("before asking to commit") :]
         for surface_name, surface in (
