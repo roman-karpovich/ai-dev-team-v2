@@ -186,12 +186,22 @@ are disabled, replaced, or bypassed.
 
 When a candidate adds reporting while the same failure still reaches automatic
 reporting, enumerate every enabled route, including direct SDK calls, logging
-integrations, framework hooks, and process hooks. Drive the production entry
-point through the terminal process boundary with production-equivalent hooks;
-a fake or in-memory transport is sufficient. Assert exact aggregate event
-cardinality plus propagation or exit. A real client around a directly invoked
+integrations, framework hooks, and process hooks. Use the lowest-cost seam that
+remains discriminating. Drive the production entry point when framework
+bootstrap or process lifecycle is load-bearing, or when equivalence of a
+narrower final-observer harness cannot be demonstrated. The narrower harness
+must preserve production initialization, automatic hooks, ordering,
+classification, exact aggregate cardinality, and propagation or exit; a fake
+or in-memory transport is sufficient. A real client around a directly invoked
 handler, `>= 1`, non-empty, and per-route call assertions prove only partial
 observability.
+
+Review proof scaffolding separately from the outcome it measures. Dependence of
+the current harness does not make a production seam load-bearing. Do not add
+production configuration, public interfaces, or dependencies solely for
+verification when a simpler equally discriminating test-only seam exists. When
+no such equivalent preserves the proof boundary, record why the production
+seam is necessary and keep it minimal.
 
 A review finding is evidence about the candidate, not authority to enlarge the
 accepted task contract. Before repair, trace it to the accepted outcome or a

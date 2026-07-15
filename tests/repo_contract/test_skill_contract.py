@@ -338,7 +338,11 @@ class SkillContractTest(unittest.TestCase):
             "enumerate every enabled reporting route",
             "direct sdk calls, logging integrations, framework hooks, and process hooks",
             "directly invoked handler in the test process is not terminal-boundary evidence",
-            "production entry point through the terminal process boundary",
+            "lowest-cost seam that remains discriminating",
+            "production entry point when framework bootstrap or process lifecycle is load-bearing",
+            "narrower seam's equivalence to every final observer",
+            "dependency of the harness does not make a production seam load-bearing",
+            "production configuration, public interfaces, or dependencies solely for verification",
             "fake or in-memory transport is acceptable",
             "exact aggregate event cardinality from all enabled routes",
             "`>= 1`, non-empty, and per-route call assertions",
@@ -350,6 +354,10 @@ class SkillContractTest(unittest.TestCase):
             "minimal dummy non-secret values",
         ):
             self.assertIn(required, verification)
+        self.assertNotIn(
+            "exercise the production entry point through the terminal process boundary",
+            verification,
+        )
         self.assertNotIn("aggregate events from both routes", verification)
         self.assertIn("never copy a secret-bearing `.env`", self.review)
 
@@ -685,8 +693,11 @@ class SkillContractTest(unittest.TestCase):
             "enumerate every enabled reporting route",
             "direct sdk calls, logging integrations, framework hooks, and process hooks",
             "directly invoked handler in the review process is not terminal-boundary evidence",
-            "production-entry-point terminal check",
+            "either uses the production entry point",
+            "reviewer independently demonstrates equivalence",
             "production-equivalent automatic hooks",
+            "dependency of the current harness is not evidence that a production seam is load-bearing",
+            "simpler equally discriminating test-only seam",
             "fake or in-memory transport is acceptable",
             "exact aggregate event cardinality from all enabled routes",
             "`>= 1`, non-empty, and per-route call assertions",
@@ -694,6 +705,10 @@ class SkillContractTest(unittest.TestCase):
         ):
             with self.subTest(required=required):
                 self.assertIn(required, review_work)
+        self.assertNotIn(
+            "unless a production-entry-point terminal check",
+            review_work,
+        )
 
     def test_single_review_accept_is_not_a_trusted_result(self) -> None:
         boundary = self.review[self.review.index("## record the boundary") :]

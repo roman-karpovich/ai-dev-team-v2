@@ -273,15 +273,26 @@ subagents, workflows, tools, or project instructions.
   non-discriminating for final delivery, aggregate event cardinality, and
   handled classification. A real client exercised only around a directly
   invoked handler in the test process is not terminal-boundary evidence.
-  Exercise the production entry point through the terminal process boundary
-  with production-equivalent automatic hooks; a fake or in-memory transport is
-  acceptable. Assert the exact aggregate event cardinality from all enabled
-  routes plus the propagation or exit outcome; `>= 1`, non-empty, and per-route
-  call assertions prove only partial observability.
+  Use the lowest-cost seam that remains discriminating. Exercise the
+  production entry point when framework bootstrap or process lifecycle is
+  load-bearing, or when a narrower seam's equivalence to every final observer
+  cannot be demonstrated. A narrower harness may drive final observers
+  directly only when repository or runtime evidence shows that it preserves
+  production initialization, automatic hooks, ordering, classification, exact
+  aggregate cardinality, and propagation or exit. A fake or in-memory
+  transport is acceptable. Assert the exact aggregate event cardinality from
+  all enabled routes plus the propagation or exit outcome; `>= 1`, non-empty,
+  and per-route call assertions prove only partial observability.
   A test that replaces the mechanism that performs the claimed outcome proves
   only the local call unless production-equivalent behavior is independently
   demonstrated. A real dependency client remains non-discriminating when its
   load-bearing hooks or integrations are disabled, replaced, or bypassed.
+  Treat test scaffolding as part of the design: dependency of the harness does
+  not make a production seam load-bearing. Do not add production configuration,
+  public interfaces, or dependencies solely for verification when a test-only
+  equivalent exists. If no such equivalent preserves the accepted
+  proof boundary, record why the production seam is necessary and keep it
+  minimal.
 - Before declaring focused verification blocked or settling for syntax-only
   checks, inspect already-ready repo-native runtimes: repository instructions
   and test targets, an existing environment associated with another checkout

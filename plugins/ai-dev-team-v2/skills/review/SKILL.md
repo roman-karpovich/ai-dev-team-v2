@@ -172,11 +172,18 @@ model identity or a silent fallback.
   non-discriminating for final delivery, aggregate event cardinality, and
   handled classification. A real client exercised only around a directly
   invoked handler in the review process is not terminal-boundary evidence.
-  Withhold acceptance unless a production-entry-point terminal check retains
-  production-equivalent automatic hooks and measures exact aggregate event
-  cardinality from all enabled routes plus propagation or exit; a fake or
-  in-memory transport is acceptable. `>= 1`, non-empty, and per-route call
-  assertions do not establish absence of duplication or loss.
+  Withhold acceptance unless a final-observer check either uses the production
+  entry point with production-equivalent automatic hooks or the reviewer
+  independently demonstrates equivalence of a narrower check across
+  initialization, every automatic route, ordering, classification, and
+  propagation or exit, while measuring exact aggregate event cardinality from
+  all enabled routes. A fake or in-memory transport is acceptable. `>= 1`,
+  non-empty, and per-route call assertions do not establish absence of
+  duplication or loss. Review proof scaffolding as part of the candidate:
+  dependency of the current harness is not evidence that a production seam is
+  load-bearing. Compare a simpler equally discriminating test-only seam before
+  accepting production configuration, public interfaces, or dependencies added
+  only for verification.
 - If the reproduced baseline already satisfies the claimed outcome or does not
   reproduce the reported incident, the candidate is not causal evidence for
   that bug-fix claim. Do not invent a historical or configuration explanation
