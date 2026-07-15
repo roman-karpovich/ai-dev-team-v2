@@ -1,6 +1,6 @@
 # Native-backend conformance
 
-This area will hold versioned, secret-free evidence for replaceable native
+This area holds versioned, secret-free evidence for replaceable native
 execution backends. A backend may use a CLI, SDK, App Server, MCP server, or a
 future native integration, but it must accept the same portable work-order
 semantics and return the same result and invocation-receipt semantics.
@@ -21,6 +21,10 @@ Required classes include:
 
 The first planned exercise is the
 [portable cold-review conformance exercise](portable-cold-review.md).
+
+Completed manual evidence includes the
+[causal-review contract dogfood](causal-review-dogfood.md) and the broader
+[development-cycle contract dogfood](development-cycle-dogfood.md).
 
 Real backend checks are explicit opt-in and never part of the default local
 suite. One real invocation per backend is sufficient for the conformance
