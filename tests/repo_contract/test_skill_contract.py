@@ -388,7 +388,9 @@ class SkillContractTest(unittest.TestCase):
             "proof harness depends on a load-bearing observer",
             "safe test-only negative-control mutation",
             "disables, replaces, or bypasses that observer",
-            "confirm the claimed-outcome assertion fails",
+            "while the trigger still executes",
+            "claimed measurable outcome itself fails",
+            "failure only at an assertion that the observer is installed, active, or reached does not qualify",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, verification)

@@ -289,8 +289,10 @@ subagents, workflows, tools, or project instructions.
   load-bearing hooks or integrations are disabled, replaced, or bypassed.
   Before freezing a candidate, when its proof harness depends on a load-bearing
   observer, run a safe test-only negative-control mutation that disables,
-  replaces, or bypasses that observer and confirm the claimed-outcome assertion
-  fails.
+  replaces, or bypasses that observer while the trigger still executes. The
+  control qualifies only when the claimed measurable outcome itself fails;
+  failure only at an assertion that the observer is installed, active, or
+  reached does not qualify.
   When one-time process-global initialization installs a load-bearing observer,
   prove at the measurement point that the observer is active and that the
   trigger reaches it; a successful initialization call or initialized registry
