@@ -96,28 +96,44 @@ changes the product or risk. Only when that question resolves a material or
 hard-to-reverse architectural fork does the host first present two genuinely
 different viable approaches, concrete tradeoffs, and a recommendation.
 
-For an incident or bug fix, preserve the existing failure policy unless the
-owner explicitly changes it. A choice that changes exit or restart, retry or
-skip, cursor or checkpoint advancement, transaction boundaries, or
+An owner-supplied claim of an observed failure enters the incident path
+regardless of whether the builder calls the work a bug fix, observability
+hardening, or an added reporting call. Only the owner may revise the desired
+outcome from incident repair to hardening. Preserve the existing failure policy
+unless the owner explicitly changes it. A choice that changes exit or restart,
+retry or skip, cursor or checkpoint advancement, transaction boundaries, or
 partial-success behavior is normative and never a reversible assumption.
+
 Re-derive the baseline through the final production-relevant observer,
 including whether and when it is reachable under relevant concurrency,
 shutdown, buffering, and framework behavior, and name that observer in the
-verified facts before implementation. When the claimed outcome depends on
-runtime reporting, propagation, lifecycle, or cardinality, run a safe focused
-baseline probe through that exact route before starting state or editing.
-Naming a destination or reasoning from source is not a substitute for an
-available probe. If the probe is unavailable or does not reproduce the
-incident, mark the causal mechanism unverified and ask the owner to choose
-between further investigation and an explicitly revised hardening goal before
-source edits. A worker, callback, future, command, or framework boundary is not
-final when production has a later automatic observer; catching there changes
-the path. Inspect targeted history plus runtime and supervisor configuration
-first. `Fail-fast` or `restart` does not silently define a timing or termination
-SLA. A fix that bypasses normal stack unwinding or cleanup, or changes the fate
-of sibling work, requires an explicit owner decision. If multiple viable
-contracts remain, present the evidence and ask one focused owner decision
-before starting state or editing.
+verified facts before implementation. When the outcome depends on runtime
+reporting, propagation, lifecycle, or cardinality, run a safe focused baseline
+probe on the immutable pre-candidate snapshot before the first or any further
+candidate edit. The probe uses the same terminal-boundary rules as candidate
+verification: exercise the production entry point when hooks are load-bearing,
+retain every enabled automatic reporting route, and measure exact aggregate
+cardinality. Naming a destination or reasoning from source is not a substitute
+for an available probe.
+
+This gate applies to new, resumed, taken-over, and handed-off work. It blocks
+candidate edits, not durable state: a longer investigation may start under a
+neutral goal that marks causality unverified, then checkpoint its probe plan,
+evidence gap, provenance, and results. On resume, reuse qualifying checkpoint
+evidence only when it identifies the immutable snapshot, observer, exercised
+route, measured result, and provenance. Otherwise probe before further edits;
+freeze any existing candidate while recovering its pre-candidate baseline.
+
+If the probe is unavailable or does not reproduce the incident, mark the causal
+mechanism unverified and ask the owner to choose between further investigation
+and an explicitly revised hardening goal before source or test edits. A worker,
+callback, future, command, or framework boundary is not final when production
+has a later automatic observer; catching there changes the path. Inspect
+targeted history plus runtime and supervisor configuration first. `Fail-fast`
+or `restart` does not silently define a timing or termination SLA. A fix that
+bypasses normal stack unwinding or cleanup, or changes the fate of sibling
+work, requires an explicit owner decision. If multiple viable contracts remain,
+present the evidence and ask one focused owner decision before candidate edits.
 
 Evidence from a sibling repository, ignored symlink target, deployment
 snapshot, or runtime configuration outside the selected worktree is external
