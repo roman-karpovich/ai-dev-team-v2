@@ -253,6 +253,24 @@ class SkillContractTest(unittest.TestCase):
             "production entry point",
             "every enabled automatic reporting route",
             "exact aggregate cardinality",
+            "copied or handwritten harness",
+            "directly installs process or framework hooks",
+            "cannot qualify the incident gate",
+            "real initialization path",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, incident)
+
+    def test_develop_incident_owner_wait_pauses_without_implicit_goal_revision(self) -> None:
+        incident = self.develop[
+            self.develop.index("in an incident or bug fix") :
+            self.develop.index("for the new-task path")
+        ]
+        for required in (
+            "an answer to an operational fact question is not authorization",
+            "explicitly revise the task goal",
+            "checkpoint the evidence and then pause the task",
+            "never leave an active lease awaiting an owner reply",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, incident)

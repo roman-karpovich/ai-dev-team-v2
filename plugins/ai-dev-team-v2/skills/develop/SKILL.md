@@ -95,7 +95,11 @@ subagents, workflows, tools, or project instructions.
      framework hooks, retain every enabled automatic reporting route, and
      measure exact aggregate cardinality when reporting is load-bearing. Naming
      an observer or reasoning from source is not a substitute for an available
-     probe. Identify the observer as the exact runtime route and measurable
+     probe. A copied or handwritten harness that directly installs process or
+     framework hooks or initializes the downstream observer is not the
+     production entry point. It can support exploration, but cannot qualify the
+     incident gate when the real initialization path is load-bearing or
+     unverified. Identify the observer as the exact runtime route and measurable
      outcome, not merely a destination, vendor, or subsystem.
 
      After resume, takeover, or handoff, reuse prior qualifying checkpoint
@@ -110,6 +114,11 @@ subagents, workflows, tools, or project instructions.
      mark the causal mechanism unverified, state the evidence gap, and ask one
      focused owner decision between further incident investigation and an
      explicitly revised hardening goal before source or test edits.
+     An answer to an operational fact question is not authorization; the owner
+     must explicitly revise the task goal before edits pursue a different
+     outcome. If the decision remains missing input when the session ends,
+     checkpoint the evidence and then pause the task. Never leave an active
+     lease awaiting an owner reply.
      A worker, callback, future, command, or framework boundary is not final
      when production has a later automatic observer; catching there changes the
      path. An explicit reporting call is not the final observer when the same
