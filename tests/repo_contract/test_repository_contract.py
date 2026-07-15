@@ -12,6 +12,7 @@ class RepositoryContractTest(unittest.TestCase):
     def test_required_bootstrap_files_exist(self) -> None:
         for relative_path in (
             "README.md",
+            "LICENSE",
             "AGENTS.md",
             "CLAUDE.md",
             "CONTRIBUTING.md",

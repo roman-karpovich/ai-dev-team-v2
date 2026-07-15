@@ -60,3 +60,7 @@ launch another tier.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md), [docs/architecture.md](docs/architecture.md),
 and [docs/readiness-gate.md](docs/readiness-gate.md).
+
+## License
+
+AI Dev Team v2 is available under the [MIT License](LICENSE).
