@@ -165,6 +165,14 @@ model identity or a silent fallback.
   claim unless equivalence is demonstrated. A real dependency client does not
   establish equivalence when its load-bearing hooks or integrations are
   disabled, replaced, or bypassed; report the gap instead of accepting green.
+  When one-time process-global initialization installs a load-bearing observer,
+  prove at the measurement point that the observer is active and that the
+  trigger reaches it; a successful initialization call or initialized registry
+  alone is insufficient. Isolate baseline, candidate, and repeated cases from
+  one another: restoring an outward hook while retaining process-global
+  initialization or integration registry state is not a consistent reset.
+  Prefer a fresh process when public teardown cannot restore both consistently;
+  do not mutate non-public dependency internals to simulate teardown.
   If a candidate adds a reporting action while the same failure propagates to
   automatic reporting, enumerate every enabled reporting route, including
   direct SDK calls, logging integrations, framework hooks, and process hooks.

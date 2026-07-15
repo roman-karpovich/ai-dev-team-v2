@@ -287,6 +287,14 @@ subagents, workflows, tools, or project instructions.
   only the local call unless production-equivalent behavior is independently
   demonstrated. A real dependency client remains non-discriminating when its
   load-bearing hooks or integrations are disabled, replaced, or bypassed.
+  When one-time process-global initialization installs a load-bearing observer,
+  prove at the measurement point that the observer is active and that the
+  trigger reaches it; a successful initialization call or initialized registry
+  alone is insufficient. Isolate baseline, candidate, and repeated cases from
+  one another: restoring an outward hook while retaining process-global
+  initialization or integration registry state is not a consistent reset.
+  Prefer a fresh process when public teardown cannot restore both consistently;
+  do not mutate non-public dependency internals to simulate teardown.
   Treat test scaffolding as part of the design: dependency of the harness does
   not make a production seam load-bearing. Do not add production configuration,
   public interfaces, or dependencies solely for verification when a test-only

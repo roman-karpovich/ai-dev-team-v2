@@ -184,6 +184,15 @@ production-equivalent behavior is separately demonstrated. A real dependency
 client remains non-discriminating when its load-bearing hooks or integrations
 are disabled, replaced, or bypassed.
 
+When one-time process-global initialization installs a load-bearing observer,
+prove at the measurement point that the observer is active and that the
+trigger reaches it; a successful initialization call or initialized registry
+alone is insufficient. Isolate baseline, candidate, and repeated cases from
+one another: restoring an outward hook while retaining process-global
+initialization or integration registry state is not a consistent reset.
+Prefer a fresh process when public teardown cannot restore both consistently;
+do not mutate non-public dependency internals to simulate teardown.
+
 When a candidate adds reporting while the same failure still reaches automatic
 reporting, enumerate every enabled route, including direct SDK calls, logging
 integrations, framework hooks, and process hooks. Use the lowest-cost seam that

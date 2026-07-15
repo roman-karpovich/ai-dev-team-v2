@@ -361,6 +361,23 @@ class SkillContractTest(unittest.TestCase):
         self.assertNotIn("aggregate events from both routes", verification)
         self.assertIn("never copy a secret-bearing `.env`", self.review)
 
+    def test_process_global_observer_initialization_is_isolated(self) -> None:
+        for surface_name, surface in (
+            ("develop", self.develop),
+            ("review", self.review),
+            ("usage", self.usage),
+        ):
+            for required in (
+                "prove at the measurement point that the observer is active and that the trigger reaches it; "
+                "a successful initialization call or initialized registry alone is insufficient",
+                "isolate baseline, candidate, and repeated cases from one another: restoring an outward hook "
+                "while retaining process-global initialization or integration registry state is not a consistent reset",
+                "prefer a fresh process when public teardown cannot restore both consistently; "
+                "do not mutate non-public dependency internals to simulate teardown",
+            ):
+                with self.subTest(surface=surface_name, required=required):
+                    self.assertIn(required, surface)
+
     def test_develop_and_review_search_ready_runtime_before_syntax_only_fallback(self) -> None:
         for surface in (self.develop, self.review):
             for required in (
