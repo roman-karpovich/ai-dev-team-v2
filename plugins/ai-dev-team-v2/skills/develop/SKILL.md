@@ -63,6 +63,11 @@ subagents, workflows, tools, or project instructions.
      fork, first present two genuinely different viable approaches with
      concrete tradeoffs and a recommendation, then ask it. Only this case
      requires the alternatives ceremony.
+   - An owner-supplied claim of an observed failure triggers the incident path
+     regardless of the builder's terminology, requested implementation, or
+     attempt to restate the work as observability hardening or adding a call.
+     Only an explicit owner decision may revise the desired outcome from
+     incident repair to hardening.
    - In an incident or bug fix, preserve the existing failure policy unless
      the owner explicitly changes it. A choice that changes exit or restart,
      retry or skip, cursor or checkpoint advancement, transaction boundaries,
@@ -71,16 +76,40 @@ subagents, workflows, tools, or project instructions.
      production-relevant observer, including whether and when that observer is
      reachable under relevant concurrency, shutdown, buffering, and framework
      behavior. Name that observer in the verified facts before implementation.
-     Before starting state or editing, run a safe focused baseline probe through
-     that final observer when the claimed outcome depends on runtime reporting,
-     propagation, lifecycle, or cardinality. Naming an observer or reasoning
-     from source is not a substitute for an available probe. Identify the
-     observer as the exact runtime route and measurable outcome, not merely a
-     destination, vendor, or subsystem. If no safe probe can run, or the probe
-     does not reproduce the incident, mark the causal mechanism unverified,
-     state the evidence gap, and ask one focused owner decision between further
-     incident investigation and an explicitly revised hardening goal before
-     source edits.
+     This is a lifecycle-wide qualification gate for new, resumed, taken-over,
+     and handed-off tasks. It must pass before the first or any further
+     candidate edit.
+
+     The gate blocks candidate edits, not ADT state creation. When investigation
+     may outlive the current turn, form a neutral investigation goal in step 7
+     with the owner-reported outcome and the causal mechanism as unverified;
+     start or resume state and checkpoint the probe plan, evidence gap,
+     provenance, and results. State creation never satisfies or bypasses the
+     gate.
+
+     Run a safe focused baseline probe through the final observer when the
+     claimed outcome depends on runtime reporting, propagation, lifecycle, or
+     cardinality. Use the identified immutable pre-candidate snapshot and the
+     same terminal-boundary validity rules required under verification below:
+     exercise the production entry point when the outcome depends on process or
+     framework hooks, retain every enabled automatic reporting route, and
+     measure exact aggregate cardinality when reporting is load-bearing. Naming
+     an observer or reasoning from source is not a substitute for an available
+     probe. Identify the observer as the exact runtime route and measurable
+     outcome, not merely a destination, vendor, or subsystem.
+
+     After resume, takeover, or handoff, reuse prior qualifying checkpoint
+     evidence only when it identifies the immutable snapshot, final observer,
+     exercised route, measured outcome, result, and evidence provenance.
+     Otherwise run or repeat the focused probe before any further candidate
+     edit. If candidate edits already exist without qualifying evidence, freeze
+     those edits, recover the immutable pre-candidate snapshot, and probe that
+     snapshot; never treat the dirty candidate as the baseline.
+
+     If no safe probe can run, or the probe does not reproduce the incident,
+     mark the causal mechanism unverified, state the evidence gap, and ask one
+     focused owner decision between further incident investigation and an
+     explicitly revised hardening goal before source or test edits.
      A worker, callback, future, command, or framework boundary is not final
      when production has a later automatic observer; catching there changes the
      path. An explicit reporting call is not the final observer when the same
@@ -93,8 +122,7 @@ subagents, workflows, tools, or project instructions.
      fix that bypasses normal stack unwinding or cleanup, or changes the fate of
      sibling work, is a normative failure-policy change and requires an
      explicit owner decision. If multiple viable contracts remain, present the
-     evidence and ask one focused owner decision before starting state or
-     editing.
+     evidence and ask one focused owner decision before candidate edits.
 7. For the new-task path in step 6, before any edit, form a compact neutral
    task contract from the preserved owner intent, corrected factual premises,
    and repository evidence. Use the contract as the existing `--goal` value;

@@ -199,7 +199,7 @@ class SkillContractTest(unittest.TestCase):
         ]
         for required in (
             "run a safe focused baseline probe",
-            "before starting state or editing",
+            "before the first or any further candidate edit",
             "naming an observer or reasoning from source is not a substitute",
             "exact runtime route and measurable outcome",
             "not merely a destination, vendor, or subsystem",
@@ -209,10 +209,53 @@ class SkillContractTest(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, incident)
 
-        self.assertLess(
-            self.develop.index("run a safe focused baseline probe"),
-            self.develop.index('adt --workspace "$workspace" start'),
-        )
+    def test_develop_incident_gate_is_lifecycle_wide_and_cannot_be_relabelled(self) -> None:
+        incident = self.develop[
+            self.develop.index("owner-supplied claim of an observed failure") :
+            self.develop.index("for the new-task path")
+        ]
+        for required in (
+            "owner-supplied claim of an observed failure",
+            "regardless of the builder's terminology",
+            "only an explicit owner decision may revise",
+            "lifecycle-wide",
+            "new, resumed, taken-over, and handed-off tasks",
+            "before the first or any further candidate edit",
+            "qualifying checkpoint evidence",
+            "freeze those edits",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, incident)
+
+    def test_develop_incident_state_persists_investigation_without_authorizing_edits(self) -> None:
+        incident = self.develop[
+            self.develop.index("in an incident or bug fix") :
+            self.develop.index("for the new-task path")
+        ]
+        for required in (
+            "blocks candidate edits, not adt state creation",
+            "neutral investigation goal",
+            "causal mechanism as unverified",
+            "checkpoint the probe plan",
+            "state creation never satisfies or bypasses",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, incident)
+
+    def test_develop_preedit_probe_uses_immutable_terminal_observer_rules(self) -> None:
+        incident = self.develop[
+            self.develop.index("in an incident or bug fix") :
+            self.develop.index("for the new-task path")
+        ]
+        for required in (
+            "identified immutable pre-candidate snapshot",
+            "same terminal-boundary validity rules",
+            "production entry point",
+            "every enabled automatic reporting route",
+            "exact aggregate cardinality",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, incident)
 
     def test_develop_goal_does_not_promote_counterfactuals_to_facts(self) -> None:
         goal = self.develop[
