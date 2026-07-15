@@ -32,10 +32,21 @@ exercised where applicable.
   implementation sentinel.
 - Fresh Codex and Claude reviews could disagree materially. Their labels were
   treated as evidence to adjudicate, not as votes or automatic approval.
-- A later clean task correctly stopped before edits when an upstream field had
-  disappeared because the underlying state was no longer fully observable.
-  Substituting zero would have produced a plausible number while silently
-  changing an exact aggregate into a visible subset.
+- A later clean task correctly stopped before edits when upstream fields had
+  disappeared and the product meaning of both current and compatibility totals
+  was unresolved. The owner then established that archived contract balances
+  had left the supported protocol and selected the replacement formulas; the
+  pause prevented the builder from inventing either decision.
+- After the owner narrowed that supply contract, an over-broad cold-review
+  brief omitted the accepted network-value domain. The reviewer then generated
+  out-of-domain monetary counterexamples and a defensive-validation detour.
+  Reissuing the same immutable candidate with the verified domain invariant and
+  explicitly unsupported inputs restored a relevant review boundary and the
+  minimal candidate was accepted.
+- The launcher exposed an exact model identifier while model-authored records
+  could only report `unknown`. Runtime/model provenance therefore belongs to
+  launcher-owned execution evidence after conclusions are fixed, not model
+  self-report or the requested model name.
 - An execution's failure to follow an already explicit contract was repaired
   under the same release. It did not automatically create another rule or
   workflow artifact.
@@ -50,6 +61,9 @@ exercised where applicable.
   persistence, cardinality, and lifecycle matter when they are load-bearing.
 - Independent review starts from a neutral contract and immutable candidate;
   same-session helpers remain advisory.
+- Neutral review context carries the accepted input domain and explicitly
+  unsupported inputs, while factual domain invariants remain independently
+  checkable.
 - Code-green and rollout-ready remain separate conclusions.
 - A safe no-code pause is a valid result when required normative input or a
   production-relevant oracle is missing.
@@ -60,4 +74,3 @@ These runs cover a small number of task classes and model executions. They do
 not establish comparative model rankings, backend interchangeability, live
 deployment behavior, or plugin stability. A clean implementation-to-publication
 cycle on additional tasks is still required.
-

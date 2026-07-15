@@ -84,6 +84,15 @@ plan/build consumes this cold-review-safe continuity, and later neutral review
 or handoff receives only that safe portion. This is not a new artifact or
 taxonomy.
 
+When acceptance depends on a domain boundary, the neutral contract includes the
+accepted input domain, any verified domain invariant, and owner-approved
+explicitly unsupported inputs. Discoverable invariants are verified from the
+repository or applicable platform evidence; owner authority defines product
+scope but does not prove a fact. A constructible out-of-domain counterexample
+must not enlarge the accepted contract. If its domain membership is material
+and unresolved, inspect the evidence or ask one focused owner decision before
+adding defensive behavior.
+
 Clear, bounded work proceeds in the same turn without a questionnaire,
 approval ritual, or invented alternatives. Skip state only when observable
 success is already satisfied and no repository work remains; report the
@@ -286,8 +295,11 @@ the independence preflight, resolves the review scope, and starts its own task.
 The invocation is the neutral review brief. When known owner supersessions
 exist, include the authoritative owner, the exact old and new requirement or
 value, the superseded source or decision, and any remaining open decision. Do
-not call an older source authoritative by itself. Then invoke the reviewer with
-an explicit full feature range:
+not call an older source authoritative by itself. Also carry the accepted input
+domain, every verified domain invariant, and explicitly unsupported inputs that
+affect acceptance. The reviewer verifies a material domain claim from available
+evidence, but an out-of-domain counterexample must not enlarge the accepted
+contract. Then invoke the reviewer with an explicit full feature range:
 
 ```text
 $ai-dev-team:review Review <BASE>..<HEAD> against the current accepted requirements. Owner decision: <old requirement> was superseded by <new requirement>.
@@ -331,6 +343,10 @@ tradeoff. Record the actual model and any visible fallback or switch only when
 the host reliably exposes them; otherwise record `unknown`. This is execution
 evidence in existing checkpoints and reports, not a new CLI option, state
 field, or `GOAL` field.
+Model-authored self-report is not execution evidence. After conclusions are
+fixed, prefer launcher-owned execution evidence such as a CLI header or
+invocation receipt. If the reviewer cannot see it, keep the reviewer-authored
+value `unknown` and attach the launcher evidence separately.
 
 Invoke the namespaced skill:
 
@@ -386,9 +402,10 @@ manual:
 1. Ask reviewer A to inspect the authoritative intent, snapshot, and diff.
 2. Keep A's findings in that native session. Before handoff, write only a
    neutral checkpoint containing the intent, exact scope and snapshot,
-   acceptance criteria, known owner supersessions, and permitted checks. Do not
-   include findings, suspected files, severities, fixes, or reviewer A's model
-   or fallback evidence until B has fixed its conclusions.
+   acceptance criteria, known owner supersessions, the accepted input domain,
+   verified domain invariants, explicitly unsupported inputs, and permitted
+   checks. Do not include findings, suspected files, severities, fixes, or
+   reviewer A's model or fallback evidence until B has fixed its conclusions.
 3. Hand off and open a fresh session in provider B. Before inspecting the
    artifact, check the context already supplied by the host for prior findings,
    suspected locations, severities, fixes, or expected conclusions. For Codex,

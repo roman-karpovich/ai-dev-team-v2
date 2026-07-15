@@ -17,7 +17,8 @@ two-model review. Run it before inspecting the artifact or mutating ADT state.
 - Inspect all context already provided to the session, including the current
   prompt, cross-session or cross-host memory, imported summaries, transcripts,
   and handoff context. Authoritative intent, owner decisions, neutral scope and
-  snapshot details, acceptance criteria, and permitted checks are safe inputs.
+  snapshot details, acceptance criteria, the accepted input domain, explicitly
+  unsupported inputs, and permitted checks are safe inputs.
   Prior findings, suspected locations, severities, proposed fixes, or expected
   conclusions contaminate a cold review.
 - If contaminating context is present, stop and label the attempt
@@ -67,6 +68,10 @@ After the reviewer has fixed its conclusions, record the actual model and any
 visible fallback or switch only when the host reliably exposes them; otherwise
 record `unknown`. Do not claim provider or model diversity from an intended
 model identity or a silent fallback.
+Model-authored self-report is not execution evidence. After conclusions are
+fixed, prefer launcher-owned execution evidence such as a CLI header or
+invocation receipt. If the reviewer cannot see it, keep the reviewer-authored
+value `unknown` and attach the launcher evidence separately.
 
 ## Connect to the task
 
@@ -82,14 +87,17 @@ model identity or a silent fallback.
    claim remains outside this MVP's assurance. Carry all known owner
    supersessions in the neutral `GOAL`: identify the authoritative owner, the
    exact old and new requirement or value, the superseded source or decision,
-   and any remaining open owner decision. Do not infer authority from a builder
-   commit message. If supplied requirement sources conflict and no
-   authoritative owner decision resolves them, stop and ask the user; do not
-   invent precedence. For a committed review, resolve `BASE` and `HEAD` to
-   immutable commit SHAs before creating state, state both values, and put the
-   resolved `$BASE..$HEAD` range in the neutral `GOAL`. If the full-change
-   boundaries are ambiguous, ask the user. Never silently use `HEAD^`; use
-   `HEAD^..HEAD` only when the user explicitly accepts a single-commit scope.
+   any remaining open owner decision, the accepted input domain, any verified
+   domain invariant, and explicitly unsupported inputs that affect acceptance.
+   Owner authority defines product scope but does not prove a factual domain
+   invariant. Do not infer authority from a builder commit message. If supplied
+   requirement sources conflict and no authoritative owner decision resolves
+   them, stop and ask the user; do not invent precedence. For a committed
+   review, resolve `BASE` and `HEAD` to immutable commit SHAs before creating
+   state, state both values, and put the resolved `$BASE..$HEAD` range in the
+   neutral `GOAL`. If the full-change boundaries are ambiguous, ask the user.
+   Never silently use `HEAD^`; use `HEAD^..HEAD` only when the user explicitly
+   accepts a single-commit scope.
 4. The launcher or user must not pre-create a standalone ADT review task. After
    the Independence preflight and read-only workspace orientation, the
    reviewer starts or connects to state itself. Set `WORKSPACE` to the selected
@@ -142,6 +150,12 @@ model identity or a silent fallback.
   list and `git diff "$BASE..$HEAD"`; do not substitute the latest commit for
   the accepted scope. In a cold review, use a fresh host session and do not
   seek the builder's transcript or another reviewer's conclusions.
+- Establish that a proposed trigger belongs to the accepted input domain before
+  treating it as a defect. Verify a claimed verified domain invariant against
+  available repository or applicable platform evidence. A constructible
+  out-of-domain counterexample must not enlarge the accepted contract; report a
+  material unsupported or contradicted domain boundary instead of silently
+  adding defensive requirements.
 - Inspect correctness, failure behavior, security and data risks,
   architectural fit, compatibility, and maintainability in proportion to the
   change. Check whether tests could pass while the requirement remains broken.
@@ -237,8 +251,9 @@ protocol:
    proposed fixes to reviewer B. Keep reviewer A's model or fallback evidence
    out of the neutral handoff until B has fixed its conclusions.
 2. Before handoff, record only a neutral note containing authoritative intent,
-   known owner supersessions, exact scope and snapshot, accepted criteria, and
-   permitted checks. Then use
+   known owner supersessions, exact scope and snapshot, accepted criteria, the
+   accepted input domain, any verified domain invariant, explicitly unsupported
+   inputs, and permitted checks. Then use
    `handoff --host "$HOST" --lease "$LEASE" --to "$OTHER_HOST"`. Tell the user
    not to copy A's findings into the next session.
 3. Start a fresh session in host B and run the Independence preflight before

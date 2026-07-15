@@ -156,7 +156,8 @@ subagents, workflows, tools, or project instructions.
    owner-proposed solution from the desired outcome, but the durable `GOAL`
    must contain only this compact, neutral, outcome-level contract:
    - desired outcome and observable success;
-   - constraints and non-goals;
+   - constraints and non-goals, including the accepted input domain and
+     explicitly unsupported inputs when they affect acceptance;
    - verified repository facts distinguished from explicit assumptions; and
    - authoritative owner decisions, waivers, and unresolved decisions.
 
@@ -166,6 +167,14 @@ subagents, workflows, tools, or project instructions.
    reporting loss, or sibling fate remain explicit assumptions until exercised;
    they must not be promoted to verified facts, justify source edits, or expand
    observable success.
+
+   When the contract depends on a domain boundary, carry both any verified
+   domain invariant and any owner-approved explicitly unsupported inputs.
+   Verify discoverable invariants from repository or applicable platform
+   evidence; owner authority defines product scope but does not prove a fact.
+   An out-of-domain counterexample must not enlarge the accepted contract. If
+   its domain membership is material and unresolved, inspect the available
+   evidence or ask one focused owner decision before adding defensive behavior.
 
    Treat a sibling repository, ignored symlink target, deployment snapshot, or
    runtime configuration outside the selected worktree as external operational
@@ -236,13 +245,15 @@ subagents, workflows, tools, or project instructions.
   it begins to distort the architecture; do not defend sunk cost.
 - Treat a review finding as evidence about the candidate, not authority to
   enlarge the accepted task contract. Before repairing it, trace it to the
-  accepted outcome or a repository constraint. Do not implement an adjacent
-  guarantee without an owner decision. If an in-scope repair materially adds
-  state, concurrency coordination, or dependence of correctness or proof on
-  non-public dependency behavior, reopen the plan and compare simpler
-  contract-preserving alternatives. Keep that complexity only when repository
-  evidence shows it is load-bearing for the accepted outcome; otherwise
-  reshape or discard it.
+  accepted outcome or a repository constraint, and establish that its trigger
+  is inside the accepted input domain. A constructible out-of-domain
+  counterexample must not enlarge the accepted contract. Do not implement an
+  adjacent guarantee without an owner decision. If an in-scope repair
+  materially adds state, concurrency coordination, or dependence of
+  correctness or proof on non-public dependency behavior, reopen the plan and
+  compare simpler contract-preserving alternatives. Keep that complexity only
+  when repository evidence shows it is load-bearing for the accepted outcome;
+  otherwise reshape or discard it.
 - Work in useful increments. After a meaningful, coherent increment, record a
   concise neutral checkpoint containing established facts, owner decisions and
   requirement supersessions, artifact state, checks, and open questions rather
@@ -256,6 +267,10 @@ subagents, workflows, tools, or project instructions.
   fallback or switch in the factual checkpoint or completion summary;
   otherwise record `unknown`. Never infer it from the requested model. This is
   execution evidence, not part of `GOAL`, and requires no new state field.
+  Model-authored self-report is not execution evidence. After conclusions are
+  fixed, prefer launcher-owned execution evidence such as a CLI header or
+  invocation receipt. If the reviewer cannot see it, keep the reviewer-authored
+  value `unknown` and attach the launcher evidence separately.
 
 - For behavior-changing code, prefer a focused failing test first. Reproduce
   the defect at the narrowest deterministic seam that still includes every

@@ -102,6 +102,22 @@ class SkillContractTest(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, self.develop)
 
+    def test_neutral_contract_preserves_the_accepted_input_domain(self) -> None:
+        for surface_name, surface in (
+            ("develop", self.develop),
+            ("review", self.review),
+            ("usage", self.usage),
+        ):
+            for required in (
+                "accepted input domain",
+                "explicitly unsupported inputs",
+                "verified domain invariant",
+                "out-of-domain counterexample",
+                "must not enlarge the accepted contract",
+            ):
+                with self.subTest(surface=surface_name, required=required):
+                    self.assertIn(required, surface)
+
     def test_develop_contract_keeps_clear_work_low_ceremony(self) -> None:
         for surface in (self.develop, self.usage):
             for required in (
@@ -612,6 +628,21 @@ class SkillContractTest(unittest.TestCase):
         ):
             with self.subTest(required=required):
                 self.assertIn(required, self.review)
+
+    def test_model_identity_uses_launcher_evidence_not_model_self_report(self) -> None:
+        for surface_name, surface in (
+            ("develop", self.develop),
+            ("review", self.review),
+            ("usage", self.usage),
+        ):
+            for required in (
+                "model-authored self-report",
+                "launcher-owned execution evidence",
+                "after conclusions are fixed",
+                "keep the reviewer-authored value `unknown`",
+            ):
+                with self.subTest(surface=surface_name, required=required):
+                    self.assertIn(required, surface)
 
     def test_second_review_keeps_model_evidence_out_of_neutral_handoff(self) -> None:
         for surface_name, surface in (
