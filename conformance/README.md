@@ -22,9 +22,8 @@ Required classes include:
 The first planned exercise is the
 [portable cold-review conformance exercise](portable-cold-review.md).
 
-Completed manual evidence includes the
-[causal-review contract dogfood](causal-review-dogfood.md) and the broader
-[development-cycle contract dogfood](development-cycle-dogfood.md).
+The privacy-safe public conclusions are recorded in the
+[development and review dogfood summary](dogfood-summary.md).
 
 Real backend checks are explicit opt-in and never part of the default local
 suite. One real invocation per backend is sufficient for the conformance
