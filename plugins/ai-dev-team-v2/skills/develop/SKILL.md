@@ -102,6 +102,23 @@ subagents, workflows, tools, or project instructions.
      unverified. Identify the observer as the exact runtime route and measurable
      outcome, not merely a destination, vendor, or subsystem.
 
+     Calling the real library function from a harness does not make the harness
+     the production initialization path. When initialization is load-bearing,
+     the actual repository bootstrap must execute it; copying its arguments or
+     configuration into probe code is still a reimplementation and cannot
+     qualify the incident gate. A fake terminal transport is acceptable only
+     when the actual repository bootstrap reaches a supported replacement seam
+     without the probe recreating the bootstrap itself.
+
+     Matching the reported outward symptoms is not incident reproduction when
+     the probe introduced an added causal precondition. Each added causal
+     precondition must be independently established as applicable to the
+     reported incident from inspected repository, deployment, or incident
+     evidence. An injected fault may stand in for an established trigger, but a
+     synthetic hang, timeout, signal, kill, or supervisor action introduced only
+     to force the outcome remains exploratory evidence. It cannot qualify the
+     incident gate or promote that hypothesized mechanism to a verified cause.
+
      After resume, takeover, or handoff, reuse prior qualifying checkpoint
      evidence only when it identifies the immutable snapshot, final observer,
      exercised route, measured outcome, result, and evidence provenance.

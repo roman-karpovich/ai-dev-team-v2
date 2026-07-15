@@ -119,6 +119,23 @@ production entry point and cannot qualify this gate while the real
 initialization path is load-bearing or unverified. Naming a destination or
 reasoning from source is not a substitute for an available probe.
 
+Calling the real library function from a harness does not make the harness the
+production initialization path. When initialization is load-bearing, the
+actual repository bootstrap must execute it; copying its arguments or
+configuration into probe code is still a reimplementation and cannot qualify
+the incident gate. A fake terminal transport remains acceptable only when the
+actual repository bootstrap reaches a supported replacement seam without the
+probe recreating that bootstrap.
+
+Matching the reported outward symptoms is not incident reproduction when a
+probe introduced an added causal precondition. Each added causal precondition
+must be independently established as applicable to the reported incident from
+inspected repository, deployment, or incident evidence. An injected fault may
+stand in for an established trigger, but a synthetic hang, timeout, signal,
+kill, or supervisor action introduced only to force the outcome remains
+exploratory evidence and cannot qualify the incident gate or verify that
+hypothesized cause.
+
 This gate applies to new, resumed, taken-over, and handed-off work. It blocks
 candidate edits, not durable state: a longer investigation may start under a
 neutral goal that marks causality unverified, then checkpoint its probe plan,

@@ -261,6 +261,34 @@ class SkillContractTest(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, incident)
 
+    def test_incident_gate_rejects_reimplemented_bootstrap_as_production_entry(self) -> None:
+        for surface in (self.develop, self.usage):
+            for required in (
+                "calling the real library function from a harness does not "
+                "make the harness the production initialization path",
+                "actual repository bootstrap",
+                "copying its arguments or configuration",
+                "fake terminal transport",
+                "supported replacement seam",
+                "cannot qualify the incident gate",
+            ):
+                with self.subTest(surface=surface[:20], required=required):
+                    self.assertIn(required, surface)
+
+    def test_incident_gate_rejects_synthetic_causal_premises(self) -> None:
+        for surface in (self.develop, self.usage):
+            for required in (
+                "matching the reported outward symptoms is not incident reproduction",
+                "added causal precondition",
+                "independently established as applicable to the reported incident",
+                "synthetic hang, timeout, signal, kill, or supervisor action",
+                "injected fault may stand in for an established trigger",
+                "remains exploratory evidence",
+                "cannot qualify the incident gate",
+            ):
+                with self.subTest(surface=surface[:20], required=required):
+                    self.assertIn(required, surface)
+
     def test_develop_incident_owner_wait_pauses_without_implicit_goal_revision(self) -> None:
         incident = self.develop[
             self.develop.index("in an incident or bug fix") :
