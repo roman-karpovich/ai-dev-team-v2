@@ -73,6 +73,9 @@ subagents, workflows, tools, or project instructions.
      behavior. Name that observer in the verified facts before implementation.
      A worker, callback, future, command, or framework boundary is not final
      when production has a later automatic observer; catching there changes the
+     path. An explicit reporting call is not the final observer when the same
+     exception is re-raised into an automatic framework or process reporter;
+     every later automatic reporting route remains part of the final observer
      path. Inspect targeted history plus runtime and supervisor configuration
      before changing that boundary. Do not infer a timing or
      termination SLA from `fail-fast` or `restart`. New evidence may invalidate
@@ -192,6 +195,13 @@ subagents, workflows, tools, or project instructions.
   propagation, or process lifecycle. When signal classification or handled
   state affects operational behavior, assert it as well as cardinality. A new
   mock or log call alone is insufficient evidence when those semantics matter.
+  When a candidate explicitly reports a failure and then re-raises it into an
+  automatic reporter, a test that patches capture or flush and asserts only
+  those calls is non-discriminating for final delivery, aggregate event
+  cardinality, and handled classification. Exercise the real reporting client
+  with production-equivalent automatic hooks through the terminal process
+  boundary; a fake or in-memory transport is acceptable. Assert the aggregate
+  events from both routes plus the propagation or exit outcome.
   A test that replaces the mechanism that performs the claimed outcome proves
   only the local call unless production-equivalent behavior is independently
   demonstrated. A real dependency client remains non-discriminating when its

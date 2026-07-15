@@ -161,6 +161,13 @@ model identity or a silent fallback.
   claim unless equivalence is demonstrated. A real dependency client does not
   establish equivalence when its load-bearing hooks or integrations are
   disabled, replaced, or bypassed; report the gap instead of accepting green.
+  If a candidate explicitly reports a failure and then re-raises it into an
+  automatic reporter, a test that patches capture or flush and asserts only
+  those calls is non-discriminating for final delivery, aggregate event
+  cardinality, and handled classification. Withhold acceptance unless a
+  terminal-boundary check exercises the real reporting client with
+  production-equivalent automatic hooks; a fake or in-memory transport is
+  acceptable. Measure the aggregate outcome of both routes.
 - If the reproduced baseline already satisfies the claimed outcome or does not
   reproduce the reported incident, the candidate is not causal evidence for
   that bug-fix claim. Do not invent a historical or configuration explanation
@@ -239,6 +246,12 @@ When the accepted contract or owner requires a trusted or multi-path result,
 all required independent paths must fix their conclusions before disclosure,
 and any material disagreement must be adjudicated from evidence. A standalone
 review report may still complete without making that stronger claim.
+
+A verdict must follow its evidence. If a review establishes that an explicit
+acceptance criterion is violated, the verdict must withhold acceptance; it
+must not downgrade that violation to a follow-up unless the owner explicitly
+waives or supersedes the criterion. Severity wording or a qualified-pass label
+does not change that boundary.
 
 Pause when interrupted. Outside the cold-review protocol, hand off only on the
 user's explicit request, then direct the user to invoke the review skill in a

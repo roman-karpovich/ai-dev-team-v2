@@ -182,6 +182,8 @@ class SkillContractTest(unittest.TestCase):
             "name that observer",
             "worker, callback, future, command, or framework boundary",
             "production has a later automatic observer",
+            "explicit reporting call is not the final observer",
+            "every later automatic reporting route",
             "do not infer a timing or termination sla from `fail-fast` or `restart`",
             "normal stack unwinding or cleanup",
             "fate of sibling work",
@@ -203,6 +205,11 @@ class SkillContractTest(unittest.TestCase):
             "signal classification or handled state",
             "persistence, propagation, or process lifecycle",
             "a new mock or log call alone is insufficient evidence",
+            "patches capture or flush",
+            "aggregate event cardinality",
+            "production-equivalent automatic hooks through the terminal process boundary",
+            "fake or in-memory transport is acceptable",
+            "aggregate events from both routes",
             "replaces the mechanism that performs the claimed outcome",
             "real dependency client",
             "hooks or integrations are disabled",
@@ -526,6 +533,11 @@ class SkillContractTest(unittest.TestCase):
             "hooks or integrations are disabled",
             "non-discriminating",
             "unless equivalence is demonstrated",
+            "patches capture or flush",
+            "aggregate event cardinality",
+            "terminal-boundary check exercises the real reporting client",
+            "production-equivalent automatic hooks",
+            "fake or in-memory transport is acceptable",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, review_work)
@@ -538,6 +550,11 @@ class SkillContractTest(unittest.TestCase):
             "required independent paths",
             "material disagreement",
             "adjudicated",
+            "a verdict must follow its evidence",
+            "explicit acceptance criterion is violated",
+            "must not downgrade that violation to a follow-up",
+            "owner explicitly waives or supersedes the criterion",
+            "severity wording or a qualified-pass label",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, boundary)
