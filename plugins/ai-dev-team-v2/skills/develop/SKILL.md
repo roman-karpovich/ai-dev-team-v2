@@ -71,6 +71,16 @@ subagents, workflows, tools, or project instructions.
      production-relevant observer, including whether and when that observer is
      reachable under relevant concurrency, shutdown, buffering, and framework
      behavior. Name that observer in the verified facts before implementation.
+     Before starting state or editing, run a safe focused baseline probe through
+     that final observer when the claimed outcome depends on runtime reporting,
+     propagation, lifecycle, or cardinality. Naming an observer or reasoning
+     from source is not a substitute for an available probe. Identify the
+     observer as the exact runtime route and measurable outcome, not merely a
+     destination, vendor, or subsystem. If no safe probe can run, or the probe
+     does not reproduce the incident, mark the causal mechanism unverified,
+     state the evidence gap, and ask one focused owner decision between further
+     incident investigation and an explicitly revised hardening goal before
+     source edits.
      A worker, callback, future, command, or framework boundary is not final
      when production has a later automatic observer; catching there changes the
      path. An explicit reporting call is not the final observer when the same
@@ -95,6 +105,13 @@ subagents, workflows, tools, or project instructions.
    - constraints and non-goals;
    - verified repository facts distinguished from explicit assumptions; and
    - authoritative owner decisions, waivers, and unresolved decisions.
+
+   Use `verified` only for facts directly observed in the selected snapshot or
+   demonstrated by concrete inspected repository and applicable runtime
+   evidence. Counterfactual claims about concurrency, shutdown, buffering,
+   reporting loss, or sibling fate remain explicit assumptions until exercised;
+   they must not be promoted to verified facts, justify source edits, or expand
+   observable success.
 
    Treat a sibling repository, ignored symlink target, deployment snapshot, or
    runtime configuration outside the selected worktree as external operational
@@ -195,17 +212,28 @@ subagents, workflows, tools, or project instructions.
   propagation, or process lifecycle. When signal classification or handled
   state affects operational behavior, assert it as well as cardinality. A new
   mock or log call alone is insufficient evidence when those semantics matter.
-  When a candidate explicitly reports a failure and then re-raises it into an
-  automatic reporter, a test that patches capture or flush and asserts only
-  those calls is non-discriminating for final delivery, aggregate event
-  cardinality, and handled classification. Exercise the real reporting client
-  with production-equivalent automatic hooks through the terminal process
-  boundary; a fake or in-memory transport is acceptable. Assert the aggregate
-  events from both routes plus the propagation or exit outcome.
+  When a candidate adds a reporting action while the same failure still reaches
+  automatic reporting, enumerate every enabled reporting route, including
+  direct SDK calls, logging integrations, framework hooks, and process hooks.
+  A test that patches capture or flush and asserts only those calls is
+  non-discriminating for final delivery, aggregate event cardinality, and
+  handled classification. A real client exercised only around a directly
+  invoked handler in the test process is not terminal-boundary evidence.
+  Exercise the production entry point through the terminal process boundary
+  with production-equivalent automatic hooks; a fake or in-memory transport is
+  acceptable. Assert the exact aggregate event cardinality from all enabled
+  routes plus the propagation or exit outcome; `>= 1`, non-empty, and per-route
+  call assertions prove only partial observability.
   A test that replaces the mechanism that performs the claimed outcome proves
   only the local call unless production-equivalent behavior is independently
   demonstrated. A real dependency client remains non-discriminating when its
   load-bearing hooks or integrations are disabled, replaced, or bypassed.
+- Before declaring focused verification blocked or settling for syntax-only
+  checks, inspect already-ready repo-native runtimes: repository instructions
+  and test targets, an existing environment associated with another checkout
+  of the same repository, and an existing local image or container. Use one
+  only if it runs the exact focused offline selector against the selected
+  worktree's source without copying secrets or mutable runtime state.
 - Never copy a secret-bearing `.env` or credential-bearing runtime config into
   another worktree to run a check. Prefer project test fixtures or minimal
   dummy non-secret values, and keep secrets out of tool output and checkpoints.

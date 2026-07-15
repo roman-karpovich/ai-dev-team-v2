@@ -192,6 +192,45 @@ class SkillContractTest(unittest.TestCase):
             with self.subTest(required=required):
                 self.assertIn(required, incident)
 
+    def test_develop_requires_observed_baseline_before_incident_edits(self) -> None:
+        incident = self.develop[
+            self.develop.index("in an incident or bug fix") :
+            self.develop.index("for the new-task path")
+        ]
+        for required in (
+            "run a safe focused baseline probe",
+            "before starting state or editing",
+            "naming an observer or reasoning from source is not a substitute",
+            "exact runtime route and measurable outcome",
+            "not merely a destination, vendor, or subsystem",
+            "mark the causal mechanism unverified",
+            "explicitly revised hardening goal",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, incident)
+
+        self.assertLess(
+            self.develop.index("run a safe focused baseline probe"),
+            self.develop.index('adt --workspace "$workspace" start'),
+        )
+
+    def test_develop_goal_does_not_promote_counterfactuals_to_facts(self) -> None:
+        goal = self.develop[
+            self.develop.index("the durable `goal` must contain only") :
+            self.develop.index("set `goal` to this contract")
+        ]
+        for required in (
+            "use `verified` only for facts directly observed",
+            "concrete inspected repository and applicable runtime evidence",
+            "counterfactual claims about concurrency, shutdown, buffering, reporting loss, or sibling fate",
+            "remain explicit assumptions until exercised",
+            "must not be promoted to verified facts",
+            "justify source edits",
+            "expand observable success",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, goal)
+
     def test_develop_verification_guardrails_cover_behavior_and_secrets(self) -> None:
         verification = self.develop[
             self.develop.index("for behavior-changing code") :
@@ -207,9 +246,14 @@ class SkillContractTest(unittest.TestCase):
             "a new mock or log call alone is insufficient evidence",
             "patches capture or flush",
             "aggregate event cardinality",
-            "production-equivalent automatic hooks through the terminal process boundary",
+            "enumerate every enabled reporting route",
+            "direct sdk calls, logging integrations, framework hooks, and process hooks",
+            "directly invoked handler in the test process is not terminal-boundary evidence",
+            "production entry point through the terminal process boundary",
             "fake or in-memory transport is acceptable",
-            "aggregate events from both routes",
+            "exact aggregate event cardinality from all enabled routes",
+            "`>= 1`, non-empty, and per-route call assertions",
+            "partial observability",
             "replaces the mechanism that performs the claimed outcome",
             "real dependency client",
             "hooks or integrations are disabled",
@@ -217,7 +261,19 @@ class SkillContractTest(unittest.TestCase):
             "minimal dummy non-secret values",
         ):
             self.assertIn(required, verification)
+        self.assertNotIn("aggregate events from both routes", verification)
         self.assertIn("never copy a secret-bearing `.env`", self.review)
+
+    def test_develop_and_review_search_ready_runtime_before_syntax_only_fallback(self) -> None:
+        for surface in (self.develop, self.review):
+            for required in (
+                "environment associated with another checkout of the same repository",
+                "exact focused offline selector",
+                "selected worktree's source",
+                "syntax-only",
+            ):
+                with self.subTest(surface=surface[:20], required=required):
+                    self.assertIn(required, surface)
 
     def test_develop_review_gate_is_explicitly_conditional(self) -> None:
         boundary = self.develop[self.develop.index("before asking to commit") :]
@@ -535,9 +591,17 @@ class SkillContractTest(unittest.TestCase):
             "unless equivalence is demonstrated",
             "patches capture or flush",
             "aggregate event cardinality",
-            "terminal-boundary check exercises the real reporting client",
+            "source-only conjecture cannot establish whether the incident reproduces",
+            "exact runtime route and measurable outcome",
+            "enumerate every enabled reporting route",
+            "direct sdk calls, logging integrations, framework hooks, and process hooks",
+            "directly invoked handler in the review process is not terminal-boundary evidence",
+            "production-entry-point terminal check",
             "production-equivalent automatic hooks",
             "fake or in-memory transport is acceptable",
+            "exact aggregate event cardinality from all enabled routes",
+            "`>= 1`, non-empty, and per-route call assertions",
+            "do not establish absence of duplication or loss",
         ):
             with self.subTest(required=required):
                 self.assertIn(required, review_work)

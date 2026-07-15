@@ -156,18 +156,27 @@ model identity or a silent fallback.
   observer changes an unhandled path and is not an equivalent counterfactual;
   account for all downstream observers and the signal cardinality. Compare the
   signal classification or handled state when it can change alerting or other
-  operational meaning. Treat a test that disables, replaces, or bypasses a
+  operational meaning. When a safe focused baseline probe is available, run it
+  at the final observer; source-only conjecture cannot establish whether the
+  incident reproduces. Identify the observer as the exact runtime route and
+  measurable outcome, not merely a destination, vendor, or subsystem. Treat a
+  test that disables, replaces, or bypasses a
   load-bearing mechanism in that path as non-discriminating for the affected
   claim unless equivalence is demonstrated. A real dependency client does not
   establish equivalence when its load-bearing hooks or integrations are
   disabled, replaced, or bypassed; report the gap instead of accepting green.
-  If a candidate explicitly reports a failure and then re-raises it into an
-  automatic reporter, a test that patches capture or flush and asserts only
-  those calls is non-discriminating for final delivery, aggregate event
-  cardinality, and handled classification. Withhold acceptance unless a
-  terminal-boundary check exercises the real reporting client with
-  production-equivalent automatic hooks; a fake or in-memory transport is
-  acceptable. Measure the aggregate outcome of both routes.
+  If a candidate adds a reporting action while the same failure propagates to
+  automatic reporting, enumerate every enabled reporting route, including
+  direct SDK calls, logging integrations, framework hooks, and process hooks.
+  A test that patches capture or flush and asserts only those calls is
+  non-discriminating for final delivery, aggregate event cardinality, and
+  handled classification. A real client exercised only around a directly
+  invoked handler in the review process is not terminal-boundary evidence.
+  Withhold acceptance unless a production-entry-point terminal check retains
+  production-equivalent automatic hooks and measures exact aggregate event
+  cardinality from all enabled routes plus propagation or exit; a fake or
+  in-memory transport is acceptable. `>= 1`, non-empty, and per-route call
+  assertions do not establish absence of duplication or loss.
 - If the reproduced baseline already satisfies the claimed outcome or does not
   reproduce the reported incident, the candidate is not causal evidence for
   that bug-fix claim. Do not invent a historical or configuration explanation
@@ -176,12 +185,15 @@ model identity or a silent fallback.
   mechanism, or the owner explicitly accepts the revised hardening goal and
   trade-off.
 - Use native review tools and focused verification. Before declaring focused
-  tests unavailable, inspect already-ready repo-native runtimes: repository
-  instructions and test targets, an existing environment, and an existing
-  local image or container. If one can run the exact focused offline selector,
-  use it. Do not install dependencies, build, or pull merely to fill a review
-  gap. This bounded discovery does not authorize a broad suite or live-network
-  smoke; report the exact residual coverage gap if no ready runtime works.
+  tests unavailable or settling for syntax-only checks, inspect already-ready
+  repo-native runtimes: repository instructions and test targets, an existing
+  environment associated with another checkout of the same repository, and an
+  existing local image or container. Use one only if it runs the exact focused
+  offline selector against the selected worktree's source without copying
+  secrets or mutable runtime state. Do not install dependencies, build, or pull
+  merely to fill a review gap. This bounded discovery does not authorize a
+  broad suite or live-network smoke; report the exact residual coverage gap if
+  no ready runtime works.
 - Never copy a secret-bearing `.env` or credential-bearing runtime config into
   the review worktree. Use existing test fixtures or minimal dummy non-secret
   values, keep secrets out of tool output, and report the check as blocked when
