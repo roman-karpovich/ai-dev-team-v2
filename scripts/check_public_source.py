@@ -103,6 +103,56 @@ def scan_repo(
     return violations
 
 
+def scan_history(
+    root: Path, external_patterns: Sequence[bytes] = (), ref: str = "HEAD"
+) -> list[Violation]:
+    root = root.resolve()
+    result = subprocess.run(
+        ["git", "rev-list", "--objects", ref],
+        cwd=root,
+        check=True,
+        stdout=subprocess.PIPE,
+    )
+    object_paths: dict[bytes, str] = {}
+    for record in result.stdout.splitlines():
+        object_id, separator, raw_path = record.partition(b" ")
+        if separator and raw_path:
+            object_paths.setdefault(object_id, os.fsdecode(raw_path))
+
+    if not object_paths:
+        return []
+
+    type_result = subprocess.run(
+        ["git", "cat-file", "--batch-check=%(objectname) %(objecttype)"],
+        cwd=root,
+        check=True,
+        input=b"\n".join(object_paths) + b"\n",
+        stdout=subprocess.PIPE,
+    )
+    blob_ids = [
+        object_id
+        for object_id, object_type in (
+            line.split(b" ", 1) for line in type_result.stdout.splitlines()
+        )
+        if object_type == b"blob"
+    ]
+
+    violations: list[Violation] = []
+    for object_id in blob_ids:
+        blob = subprocess.run(
+            ["git", "cat-file", "blob", os.fsdecode(object_id)],
+            cwd=root,
+            check=True,
+            stdout=subprocess.PIPE,
+        ).stdout
+        path = object_paths[object_id]
+        historical_path = f"{path}@{os.fsdecode(object_id[:12])}"
+        violations.extend(
+            find_line_violations(historical_path, blob, external_patterns)
+        )
+    return violations
+
+
 def load_external_patterns() -> tuple[bytes, ...]:
     pattern_file = os.environ.get("PUBLIC_SOURCE_PATTERNS_FILE")
     if not pattern_file:
@@ -116,7 +166,9 @@ def load_external_patterns() -> tuple[bytes, ...]:
 
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
-    violations = scan_repo(root, load_external_patterns())
+    external_patterns = load_external_patterns()
+    violations = scan_repo(root, external_patterns)
+    violations.extend(scan_history(root, external_patterns))
     for violation in violations:
         print(f"{violation.path}:{violation.line}: {violation.rule}")
     return 1 if violations else 0

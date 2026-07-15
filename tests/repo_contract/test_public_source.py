@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -15,6 +16,9 @@ import check_public_source
 class PublicSourceTest(unittest.TestCase):
     def test_current_tree_is_portable(self) -> None:
         self.assertEqual([], check_public_source.scan_repo(ROOT))
+
+    def test_current_history_is_portable(self) -> None:
+        self.assertEqual([], check_public_source.scan_history(ROOT))
 
     def test_detects_absolute_home_locator_without_echoing_content(self) -> None:
         locator = b"/" + b"Users" + b"/" + b"example" + b"/project"
@@ -61,6 +65,43 @@ class PublicSourceTest(unittest.TestCase):
                     root.resolve(), link.resolve(strict=False)
                 )
             )
+
+    def test_history_detects_locator_deleted_from_current_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as root_dir:
+            root = Path(root_dir)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Public Source Test"],
+                cwd=root,
+                check=True,
+            )
+            locator = b"/" + b"Users" + b"/" + b"example" + b"/private"
+            artifact = root / "artifact.txt"
+            artifact.write_bytes(locator)
+            subprocess.run(["git", "add", "artifact.txt"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "commit", "-q", "-m", "add artifact"],
+                cwd=root,
+                check=True,
+            )
+            artifact.unlink()
+            subprocess.run(["git", "add", "-u"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "commit", "-q", "-m", "remove artifact"],
+                cwd=root,
+                check=True,
+            )
+
+            self.assertEqual([], check_public_source.scan_repo(root))
+            violations = check_public_source.scan_history(root)
+            self.assertEqual(1, len(violations))
+            self.assertEqual("absolute-home", violations[0].rule)
+            self.assertTrue(violations[0].path.startswith("artifact.txt@"))
 
 
 if __name__ == "__main__":
