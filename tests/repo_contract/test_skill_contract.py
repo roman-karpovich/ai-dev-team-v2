@@ -389,6 +389,23 @@ class SkillContractTest(unittest.TestCase):
                 with self.subTest(surface=surface[:20], required=required):
                     self.assertIn(required, surface)
 
+    def test_develop_reconsiders_candidate_complexity_before_freeze(self) -> None:
+        boundary = self.develop[self.develop.index("## leave a safe boundary") :]
+        reconsider = boundary.index("reconsider the whole candidate")
+        freeze = boundary.index("freeze the candidate as an immutable range")
+        self.assertLess(reconsider, freeze)
+
+        reconsideration = boundary[reconsider:freeze]
+        for required in (
+            "proof scaffolding and reliance on non-public dependency interfaces",
+            "green, discriminating checks establish behavior, not the necessity of incidental machinery",
+            "simpler contract-preserving candidate",
+            "same accepted proof boundary",
+            "reshape to it before freezing",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, reconsideration)
+
     def test_develop_review_gate_is_explicitly_conditional(self) -> None:
         boundary = self.develop[self.develop.index("before asking to commit") :]
         for required in (

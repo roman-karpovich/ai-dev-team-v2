@@ -332,7 +332,12 @@ subagents, workflows, tools, or project instructions.
 
 - Never launch another provider's CLI, SDK, MCP server, or model. MVP handoff
   is manual and checkpoint-based.
-- Before asking to commit or open a PR, always state whether independent review
+- Before asking to commit or open a PR, reconsider the whole candidate against
+  the accepted outcome, including its proof scaffolding and reliance on
+  non-public dependency interfaces. Green, discriminating checks establish
+  behavior, not the necessity of incidental machinery. When a simpler
+  contract-preserving candidate reaches the same accepted proof boundary,
+  reshape to it before freezing. Then always state whether independent review
   ran. Missing review blocks completion only when the selected assurance
   profile, accepted task contract, or owner requires it. In that case call the
   result an implementation checkpoint and keep the task active. Freeze the
