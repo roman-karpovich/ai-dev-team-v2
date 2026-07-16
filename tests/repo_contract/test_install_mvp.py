@@ -473,10 +473,10 @@ esac
             symlink_repo / "plugins/ai-dev-team-v2",
             symlinks=True,
         )
-        (
-            symlink_repo
-            / "plugins/ai-dev-team-v2/scripts/payload-link"
-        ).symlink_to("adt.py")
+        plugin_fixture = symlink_repo / "plugins/ai-dev-team-v2"
+        self.make_tree_read_only(plugin_fixture)
+        self.make_tree_owner_writable(plugin_fixture)
+        (plugin_fixture / "scripts/payload-link").symlink_to("adt.py")
 
         matching_result = self.run_installer(
             mode="matching",
