@@ -119,44 +119,51 @@ class SkillContractTest(unittest.TestCase):
                     self.assertIn(required, surface)
 
     def test_local_upstream_derivation_requires_semantic_equivalence(self) -> None:
-        trigger = "removed, deprecated, or unavailable upstream value"
-        for surface_name, surface in (
-            ("develop", self.develop),
-            ("review", self.review),
-        ):
-            for required in (
-                trigger,
-                "semantic equivalence as a load-bearing factual invariant",
-                "what the upstream value included and excluded",
-                "authoritative upstream specification, source, or targeted history",
-                "independently of the candidate formula and tests",
-                "tests that mirror the derivation do not establish equivalence",
-                "the owner explicitly approves the semantic change",
-            ):
-                with self.subTest(surface=surface_name, required=required):
-                    self.assertIn(required, surface)
-
+        rule_start = "when a removed, deprecated, or unavailable upstream value"
+        develop_rule_start = self.develop.index(rule_start)
+        review_rule_start = self.review.index(rule_start)
+        develop_rule = " ".join(
+            self.develop[
+                develop_rule_start : self.develop.index(
+                    "treat a sibling repository",
+                    develop_rule_start,
+                )
+            ].split()
+        )
+        review_rule = " ".join(
+            self.review[
+                review_rule_start : self.review.index(
+                    "- inspect correctness, failure behavior",
+                    review_rule_start,
+                )
+            ].split()
+        )
+        common_rule = (
+            "when a removed, deprecated, or unavailable upstream value is replaced "
+            "by a local derivation, treat semantic equivalence as a load-bearing "
+            "factual invariant. ordinary local calculations and refactors are "
+            "outside this check unless they replace such an upstream value. "
+            "establish what the upstream value included and excluded from "
+            "authoritative upstream specification, source, or targeted history "
+            "independently of the candidate formula and tests. tests that mirror "
+            "the derivation do not establish equivalence. if equivalence cannot be "
+            "established or the semantics differ, "
+        )
+        self.assertEqual(
+            common_rule
+            + "pause before candidate edits unless the owner explicitly approves "
+            "the semantic change.",
+            develop_rule,
+        )
+        self.assertEqual(
+            common_rule
+            + "withhold acceptance unless the owner explicitly approves the "
+            "semantic change.",
+            review_rule,
+        )
         self.assertLess(
-            self.develop.index(trigger),
-            self.develop.index('adt --workspace "$workspace" start'),
-        )
-        develop_rule_start = self.develop.index(trigger)
-        develop_rule_end = self.develop.index(
-            "treat a sibling repository",
             develop_rule_start,
-        )
-        review_rule_start = self.review.index(trigger)
-        review_rule_end = self.review.index(
-            "inspect correctness, failure behavior",
-            review_rule_start,
-        )
-        self.assertIn(
-            "pause before candidate edits",
-            self.develop[develop_rule_start:develop_rule_end],
-        )
-        self.assertIn(
-            "withhold acceptance",
-            self.review[review_rule_start:review_rule_end],
+            self.develop.index('adt --workspace "$workspace" start'),
         )
 
     def test_develop_contract_keeps_clear_work_low_ceremony(self) -> None:

@@ -178,12 +178,13 @@ subagents, workflows, tools, or project instructions.
 
    When a removed, deprecated, or unavailable upstream value is replaced by a
    local derivation, treat semantic equivalence as a load-bearing factual
-   invariant. Establish what the upstream value included and excluded from
-   authoritative upstream specification, source, or targeted history
-   independently of the candidate formula and tests. Tests that mirror the
-   derivation do not establish equivalence. If equivalence cannot be established
-   or the semantics differ, pause before candidate edits unless the owner
-   explicitly approves the semantic change.
+   invariant. Ordinary local calculations and refactors are outside this check
+   unless they replace such an upstream value. Establish what the upstream value
+   included and excluded from authoritative upstream specification, source, or
+   targeted history independently of the candidate formula and tests. Tests that
+   mirror the derivation do not establish equivalence. If equivalence cannot be
+   established or the semantics differ, pause before candidate edits unless the
+   owner explicitly approves the semantic change.
 
    Treat a sibling repository, ignored symlink target, deployment snapshot, or
    runtime configuration outside the selected worktree as external operational
