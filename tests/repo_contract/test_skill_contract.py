@@ -118,6 +118,31 @@ class SkillContractTest(unittest.TestCase):
                 with self.subTest(surface=surface_name, required=required):
                     self.assertIn(required, surface)
 
+    def test_local_upstream_derivation_requires_semantic_equivalence(self) -> None:
+        trigger = "removed, deprecated, or unavailable upstream value"
+        for surface_name, surface in (
+            ("develop", self.develop),
+            ("review", self.review),
+        ):
+            for required in (
+                trigger,
+                "semantic equivalence as a load-bearing factual invariant",
+                "what the upstream value included and excluded",
+                "authoritative upstream specification, source, or targeted history",
+                "independently of the candidate formula and tests",
+                "tests that mirror the derivation do not establish equivalence",
+                "the owner explicitly approves the semantic change",
+            ):
+                with self.subTest(surface=surface_name, required=required):
+                    self.assertIn(required, surface)
+
+        self.assertLess(
+            self.develop.index(trigger),
+            self.develop.index('adt --workspace "$workspace" start'),
+        )
+        self.assertIn("pause before candidate edits", self.develop)
+        self.assertIn("withhold acceptance", self.review)
+
     def test_develop_contract_keeps_clear_work_low_ceremony(self) -> None:
         for surface in (self.develop, self.usage):
             for required in (
