@@ -1,12 +1,12 @@
 {
   "name": "ai-dev-team",
-  "version": "0.1.24+codex.20260715174949",
+  "version": "0.1.25+codex.20260716092658",
   "description": "Run controlled, resumable development and evidence-based review from Codex.",
   "author": {
     "name": "AI Dev Team contributors",
     "url": "https://github.com/roman-karpovich/ai-dev-team-v2"
   },
-  "homepage": "https://github.com/roman-karpovich/ai-dev-team-v2/blob/main/docs/mvp-usage.md",
+  "homepage": "https://github.com/roman-karpovich/ai-dev-team-v2/blob/master/docs/mvp-usage.md",
   "repository": "https://github.com/roman-karpovich/ai-dev-team-v2",
   "keywords": [
     "development",
