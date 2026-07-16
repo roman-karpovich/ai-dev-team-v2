@@ -487,7 +487,7 @@ class ReviewGateCliTest(unittest.TestCase):
             {
                 "id": "finding-1",
                 "severity": "HIGH",
-                "summary": "A defect with a nonexistent evidence reference.",
+                "summary": "The accepted path constraint is violated.",
                 "evidence_refs": ["missing-evidence"],
             }
         ]
@@ -501,16 +501,20 @@ class ReviewGateCliTest(unittest.TestCase):
                 {
                     "id": "finding-1",
                     "severity": "LOW",
-                    "summary": "Even a low-severity finding holds in v0.",
+                    "summary": "The accepted authorization criterion is violated.",
                     "evidence_refs": ["evidence-inspection"],
                 }
             ]
 
         def gap(builder: BundleBuilder) -> None:
-            builder.results["path-alpha"]["gaps"] = ["Could not inspect generated code."]
+            builder.results["path-alpha"]["gaps"] = [
+                "Required evidence for the in-scope generated-code claim is missing."
+            ]
 
         def degradation(builder: BundleBuilder) -> None:
-            builder.receipts["path-alpha"]["degradations"] = ["Usage was estimated."]
+            builder.receipts["path-alpha"]["degradations"] = [
+                "A focused test check required by this run was skipped."
+            ]
 
         def incomplete(builder: BundleBuilder) -> None:
             builder.results["path-alpha"]["terminal_status"] = "CANCELLED"

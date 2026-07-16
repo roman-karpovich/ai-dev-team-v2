@@ -585,6 +585,32 @@ class SkillContractTest(unittest.TestCase):
                 with self.subTest(surface=surface_name, required=required):
                     self.assertIn(required, surface)
 
+    def test_review_producer_arrays_are_blocker_only(self) -> None:
+        contract = read("conformance/portable-cold-review-contract-v0.md")
+        for surface_name, surface in (
+            ("review", self.review),
+            ("usage", self.usage),
+            ("conformance", contract),
+        ):
+            for required in (
+                "blocker-only arrays",
+                "unresolved evidence-backed violation",
+                "stated acceptance claim or repository constraint",
+                "within the accepted domain",
+                "missing evidence needed to decide an in-scope claim",
+                "required by the current run",
+                "actually lost, weakened, or skipped",
+                "accepted non-goals",
+                "accepted tradeoffs",
+                "explicitly unsupported boundaries",
+                "hypothetical limitations or skips of another environment",
+                "evidence or closeout",
+                "contradict the accepted contract",
+                "reachable inside the accepted domain",
+            ):
+                with self.subTest(surface=surface_name, required=required):
+                    self.assertIn(required, surface)
+
     def test_develop_skips_state_only_when_no_repository_work_remains(self) -> None:
         for surface in (self.develop, self.usage):
             for required in (
