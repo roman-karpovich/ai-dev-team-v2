@@ -119,6 +119,50 @@ raise SystemExit(0 if any(item.get("name") == name for item in items) else 1)
 ' "$marketplace"
 }
 
+claude_marketplace_metadata() {
+  claude plugin marketplace list --json \
+    | python3 -c '
+import json
+import sys
+
+name = sys.argv[1]
+items = json.load(sys.stdin)
+for item in items:
+    if item.get("name") == name:
+        source = item.get("source", "")
+        root = item.get("path", "")
+        print(source + "\t" + root)
+        raise SystemExit(0)
+raise SystemExit(1)
+' "$marketplace"
+}
+
+validate_claude_marketplace() {
+  local source_type
+  local configured_root
+  local configured_realpath
+  local repo_realpath
+  IFS=$'\t' read -r source_type configured_root < <(claude_marketplace_metadata)
+
+  if [[ "$source_type" != "directory" || -z "$configured_root" ]]; then
+    echo "Claude marketplace $marketplace does not use a local directory source" >&2
+    echo "remove the marketplace explicitly, then rerun the installer" >&2
+    return 1
+  fi
+
+  configured_realpath="$(cd "$configured_root" 2>/dev/null && pwd -P || true)"
+  repo_realpath="$(cd "$repo_root" && pwd -P)"
+  if [[ "$configured_realpath" == "$repo_realpath" ]]; then
+    return 0
+  fi
+
+  echo "Claude marketplace $marketplace does not point to this checkout" >&2
+  echo "configured: $configured_root" >&2
+  echo "expected: $repo_root" >&2
+  echo "remove the marketplace explicitly before changing its source" >&2
+  return 1
+}
+
 has_claude_plugin() {
   local plugin_id="${1:-$plugin@$marketplace}"
   claude plugin list --json \
@@ -134,19 +178,38 @@ raise SystemExit(0 if any(item.get("id") == plugin_id for item in items) else 1)
 
 claude_plugin_install_path() {
   local plugin_id="${1:-$plugin@$marketplace}"
+  local expected_version
+  expected_version="$(claude_manifest_version)"
   claude plugin list --json \
     | python3 -c '
 import json
 import sys
 
 plugin_id = sys.argv[1]
+expected_version = sys.argv[2]
 items = json.load(sys.stdin)
 for item in items:
     if item.get("id") == plugin_id:
+        version = item.get("version", "")
+        if version != expected_version:
+            raise SystemExit(
+                f"Claude reported installed version {version!r}, expected "
+                f"{expected_version!r}"
+            )
         print(item.get("installPath", ""))
         raise SystemExit(0)
 raise SystemExit(1)
-' "$plugin_id"
+' "$plugin_id" "$expected_version"
+}
+
+claude_manifest_version() {
+  python3 -c '
+import json
+import sys
+
+with open(sys.argv[1]) as manifest:
+    print(json.load(manifest)["version"])
+' "$repo_root/plugins/$plugin_dir/.claude-plugin/plugin.json"
 }
 
 plugin_payloads_match() {
@@ -405,6 +468,7 @@ install_claude() {
   if ! has_claude_marketplace; then
     claude plugin marketplace add "$repo_root"
   fi
+  validate_claude_marketplace
   if has_claude_plugin "$plugin@$marketplace"; then
     claude plugin update "$plugin@$marketplace"
   else
