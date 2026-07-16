@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -11,9 +12,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_SOURCE = ROOT / "plugins/ai-dev-team-v2"
-PLUGIN_VERSION = json.loads(
-    (PLUGIN_SOURCE / ".codex-plugin/plugin.json").read_text()
-)["version"]
 
 
 class InstallMvpTest(unittest.TestCase):
@@ -23,6 +21,7 @@ class InstallMvpTest(unittest.TestCase):
         self.home = self.root / "home"
         self.bin = self.root / "bin"
         self.install_root = self.root / "installed-plugin"
+        self.wrong_install_root = self.root / "wrong-installed-plugin"
         self.state = self.root / "state"
         self.home.mkdir()
         self.bin.mkdir()
@@ -76,9 +75,14 @@ PY
       echo "marketplace was not refreshed" >&2
       exit 9
     fi
+    if [[ "$FAKE_CODEX_MODE" == "add-failure" ]]; then
+      exit 7
+    fi
     rm -rf "$FAKE_CODEX_INSTALL_ROOT"
+    rm -rf "$FAKE_CODEX_WRONG_INSTALL_ROOT"
     if [[ "$FAKE_CODEX_MODE" != "missing" ]]; then
       cp -R "$FAKE_CODEX_SOURCE" "$FAKE_CODEX_INSTALL_ROOT"
+      chmod -R u+w "$FAKE_CODEX_INSTALL_ROOT"
     fi
     if [[ "$FAKE_CODEX_MODE" == "stale" ]]; then
       printf '\\nstale cache\\n' >> "$FAKE_CODEX_INSTALL_ROOT/skills/develop/SKILL.md"
@@ -86,24 +90,49 @@ PY
     if [[ "$FAKE_CODEX_MODE" == "foreign-manifest" ]]; then
       printf '\\n' >> "$FAKE_CODEX_INSTALL_ROOT/.claude-plugin/plugin.json"
     fi
+    if [[ "$FAKE_CODEX_MODE" == "foreign-extra" ]]; then
+      mkdir -p "$FAKE_CODEX_INSTALL_ROOT/.claude-plugin/extra"
+      printf 'unexpected payload\\n' > "$FAKE_CODEX_INSTALL_ROOT/.claude-plugin/extra/plugin.json"
+    fi
     if [[ "$FAKE_CODEX_MODE" == "native-manifest" ]]; then
       printf '\\n' >> "$FAKE_CODEX_INSTALL_ROOT/.codex-plugin/plugin.json"
+    fi
+    if [[ "$FAKE_CODEX_MODE" == "non-executable" ]]; then
+      chmod a-x "$FAKE_CODEX_INSTALL_ROOT/bin/adt"
+    fi
+    if [[ "$FAKE_CODEX_MODE" == "owner-only-executable" ]]; then
+      chmod 700 "$FAKE_CODEX_INSTALL_ROOT/bin/adt"
+    fi
+    if [[ "$FAKE_CODEX_MODE" == "wrong-installed-path" ]]; then
+      mkdir -p "$FAKE_CODEX_WRONG_INSTALL_ROOT"
+      printf 'not the plugin payload\\n' > "$FAKE_CODEX_WRONG_INSTALL_ROOT/unexpected.txt"
     fi
     python3 - <<'PY'
 import json
 import os
 
+mode = os.environ["FAKE_CODEX_MODE"]
 version = os.environ["FAKE_CODEX_VERSION"]
-if os.environ["FAKE_CODEX_MODE"] == "wrong-version":
+if mode == "wrong-version":
     version = version.split("+", 1)[0] + "+codex.stale"
-print(json.dumps({
-    "pluginId": "ai-dev-team@ai-dev-team-v2-local",
+plugin_id = "ai-dev-team@ai-dev-team-v2-local"
+if mode == "wrong-plugin-id":
+    plugin_id = "other-plugin@ai-dev-team-v2-local"
+installed_path = os.environ["FAKE_CODEX_INSTALL_ROOT"]
+if mode == "empty-installed-path":
+    installed_path = ""
+elif mode == "wrong-installed-path":
+    installed_path = os.environ["FAKE_CODEX_WRONG_INSTALL_ROOT"]
+result = {
+    "pluginId": plugin_id,
     "name": "ai-dev-team",
     "marketplaceName": "ai-dev-team-v2-local",
     "version": version,
-    "installedPath": os.environ["FAKE_CODEX_INSTALL_ROOT"],
     "authPolicy": "ON_INSTALL",
-}))
+}
+if mode != "missing-installed-path":
+    result["installedPath"] = installed_path
+print(json.dumps(result))
 PY
     ;;
   *)
@@ -148,34 +177,72 @@ esac
         fake_claude.chmod(0o755)
 
     def tearDown(self) -> None:
+        self.make_tree_owner_writable(self.root)
         self.temporary.cleanup()
+
+    @staticmethod
+    def make_tree_owner_writable(root: Path) -> None:
+        if not root.exists() or root.is_symlink():
+            return
+        for directory, directory_names, file_names in os.walk(root):
+            paths = [Path(directory)]
+            paths.extend(Path(directory) / name for name in directory_names)
+            paths.extend(Path(directory) / name for name in file_names)
+            for path in paths:
+                if not path.is_symlink():
+                    path.chmod(path.stat().st_mode | stat.S_IWUSR)
+
+    @staticmethod
+    def make_tree_read_only(root: Path) -> None:
+        write_bits = stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH
+        for directory, directory_names, file_names in os.walk(root):
+            paths = [Path(directory)]
+            paths.extend(Path(directory) / name for name in directory_names)
+            paths.extend(Path(directory) / name for name in file_names)
+            for path in paths:
+                if not path.is_symlink():
+                    path.chmod(path.stat().st_mode & ~write_bits)
+
+    def copy_writable_plugin(self) -> None:
+        if self.install_root.exists():
+            self.make_tree_owner_writable(self.install_root)
+            shutil.rmtree(self.install_root)
+        shutil.copytree(PLUGIN_SOURCE, self.install_root)
+        self.make_tree_owner_writable(self.install_root)
 
     def run_installer(
         self,
         *,
         mode: str,
-        marketplace_root: Path = ROOT,
+        marketplace_root: Path | None = None,
         marketplace_type: str = "local",
+        repo_root: Path = ROOT,
         require_upgrade: bool = False,
     ) -> subprocess.CompletedProcess[str]:
+        marketplace_root = marketplace_root or repo_root
+        plugin_source = repo_root / "plugins/ai-dev-team-v2"
+        plugin_version = json.loads(
+            (plugin_source / ".codex-plugin/plugin.json").read_text()
+        )["version"]
         environment = os.environ.copy()
         environment.update(
             {
                 "HOME": str(self.home),
                 "PATH": f"{self.bin}:{environment['PATH']}",
                 "FAKE_CODEX_INSTALL_ROOT": str(self.install_root),
+                "FAKE_CODEX_WRONG_INSTALL_ROOT": str(self.wrong_install_root),
                 "FAKE_CODEX_MARKETPLACE_ROOT": str(marketplace_root),
                 "FAKE_CODEX_MARKETPLACE_TYPE": marketplace_type,
                 "FAKE_CODEX_MODE": mode,
                 "FAKE_CODEX_REQUIRE_UPGRADE": "1" if require_upgrade else "0",
-                "FAKE_CODEX_SOURCE": str(PLUGIN_SOURCE),
+                "FAKE_CODEX_SOURCE": str(plugin_source),
                 "FAKE_CODEX_STATE": str(self.state),
-                "FAKE_CODEX_VERSION": PLUGIN_VERSION,
+                "FAKE_CODEX_VERSION": plugin_version,
             }
         )
         return subprocess.run(
-            [str(ROOT / "scripts/install-mvp"), "--codex"],
-            cwd=ROOT,
+            [str(repo_root / "scripts/install-mvp"), "--codex"],
+            cwd=repo_root,
             env=environment,
             text=True,
             stdout=subprocess.PIPE,
@@ -208,8 +275,30 @@ esac
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(self.install_root.is_dir())
 
+    def test_executable_mode_is_normalized_to_owner_semantics(self) -> None:
+        result = self.run_installer(mode="owner-only-executable")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_installer_does_not_require_source_write_access(self) -> None:
+        read_only_repo = self.root / "read-only-repo"
+        (read_only_repo / "scripts").mkdir(parents=True)
+        shutil.copy2(ROOT / "scripts/install-mvp", read_only_repo / "scripts")
+        shutil.copytree(
+            PLUGIN_SOURCE,
+            read_only_repo / "plugins/ai-dev-team-v2",
+        )
+        self.make_tree_read_only(read_only_repo)
+
+        result = self.run_installer(
+            mode="matching",
+            repo_root=read_only_repo,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_claude_ignores_codex_manifest_but_verifies_native_content(self) -> None:
-        shutil.copytree(PLUGIN_SOURCE, self.install_root)
+        self.copy_writable_plugin()
         with (self.install_root / ".codex-plugin/plugin.json").open("a") as manifest:
             manifest.write("\n")
 
@@ -223,13 +312,17 @@ esac
 
         for relative_path in (
             ".claude-plugin/plugin.json",
+            "bin/adt",
             "skills/develop/SKILL.md",
         ):
             with self.subTest(relative_path=relative_path):
-                shutil.rmtree(self.install_root)
-                shutil.copytree(PLUGIN_SOURCE, self.install_root)
-                with (self.install_root / relative_path).open("a") as native_content:
-                    native_content.write("\nstale native content\n")
+                self.copy_writable_plugin()
+                native_content = self.install_root / relative_path
+                if relative_path == "bin/adt":
+                    native_content.chmod(native_content.stat().st_mode & ~0o111)
+                else:
+                    with native_content.open("a") as stream:
+                        stream.write("\nstale native content\n")
 
                 stale_result = self.run_claude_installer()
 
@@ -238,6 +331,28 @@ esac
                     "Claude's cached plugin does not match the local source",
                     stale_result.stderr,
                 )
+
+    def test_hosts_ignore_only_the_foreign_manifest(self) -> None:
+        codex_result = self.run_installer(mode="foreign-extra")
+
+        self.assertNotEqual(codex_result.returncode, 0)
+        self.assertIn(
+            "Codex's cached plugin does not match the local source",
+            codex_result.stderr,
+        )
+
+        self.copy_writable_plugin()
+        foreign_extra = self.install_root / ".codex-plugin/extra/plugin.json"
+        foreign_extra.parent.mkdir()
+        foreign_extra.write_text("unexpected payload\n")
+
+        claude_result = self.run_claude_installer()
+
+        self.assertNotEqual(claude_result.returncode, 0)
+        self.assertIn(
+            "Claude's cached plugin does not match the local source",
+            claude_result.stderr,
+        )
 
     def test_git_marketplace_snapshot_is_refreshed_before_plugin_add(self) -> None:
         snapshot = self.root / "marketplace-snapshot"
@@ -270,6 +385,7 @@ esac
         expectations = {
             "missing": "Codex reported an invalid install path",
             "native-manifest": "Codex's cached plugin does not match the local source",
+            "non-executable": "Codex's cached plugin does not match the local source",
             "stale": "Codex's cached plugin does not match the local source",
             "wrong-version": "Codex installed version",
         }
@@ -290,6 +406,35 @@ esac
 
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(message, result.stderr)
+
+    def test_codex_rejects_untrusted_install_result_fields(self) -> None:
+        expectations = {
+            "add-failure": (7, None),
+            "empty-installed-path": (
+                None,
+                "Codex reported an invalid install path",
+            ),
+            "missing-installed-path": (
+                None,
+                "Codex reported an invalid install path",
+            ),
+            "wrong-installed-path": (
+                None,
+                "Codex's cached plugin does not match the local source",
+            ),
+            "wrong-plugin-id": (None, "Codex installed plugin"),
+        }
+
+        for mode, (returncode, message) in expectations.items():
+            with self.subTest(mode=mode):
+                result = self.run_installer(mode=mode)
+
+                if returncode is None:
+                    self.assertNotEqual(result.returncode, 0)
+                else:
+                    self.assertEqual(result.returncode, returncode)
+                if message is not None:
+                    self.assertIn(message, result.stderr)
 
 
 if __name__ == "__main__":
