@@ -535,6 +535,19 @@ prove the launcher's attestations, adjudicate findings, or authorize release.
 The bundle manifest provides integrity after composition, not authenticity
 against an actor able to reseal it.
 
+### Continue after `HOLD`
+
+Treat a `HOLD` bundle as immutable review evidence. Inspect its reason codes,
+adjudicate model findings against repository evidence and owner decisions, and
+repair the candidate or launcher boundary that actually failed. If the
+candidate changes, assign it a new immutable snapshot and run fresh independent
+review paths into a new bundle. If invocation evidence was malformed, rerun the
+affected path instead of rewriting its receipt.
+
+Never edit a model result, receipt, or manifest merely to make the existing
+bundle pass. A later clean `REPORT_ONLY` must be attributable to newly produced
+evidence, and still is not acceptance or release authorization.
+
 ## What to evaluate
 
 Use the MVP on bounded, existing tasks and note:

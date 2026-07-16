@@ -99,7 +99,12 @@ The referenced work order is provider-neutral and has exactly these fields:
   scope.
 
 `permissions` has exactly `filesystem: READ_ONLY` and `network: DENY` or
-`ALLOW`.
+`ALLOW`. `filesystem` describes access to the declared artifact, not every
+filesystem operation performed by the reviewer process. A backend may provide
+separate writable scratch and final-output locations outside the artifact.
+The launcher owns and records that separation; a provider permission-mode
+label or model-authored claim is not evidence that the artifact boundary was
+enforced.
 
 `independence` has exactly `fresh_context: true` and
 `prior_results_visible: false`. A v0 work order cannot weaken this policy.
@@ -181,7 +186,10 @@ nonzero.
 Receipt identity, capabilities, permissions, timing, usage, and independence
 are launcher-reported in manual v0. The gate checks internal consistency; it
 does not independently prove those claims or that one reviewer could not see
-the other's output.
+the other's output. In particular, `permissions_observed.filesystem` reports
+the observed artifact permission. It does not claim that scratch or output
+locations were read-only, and a provider CLI flag alone cannot establish the
+observation.
 
 ## Gate semantics
 

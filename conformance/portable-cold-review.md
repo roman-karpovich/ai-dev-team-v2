@@ -54,8 +54,19 @@ Provider and model selection belong to the backend profile, not the portable
 work order. Runtime identity and input digests are observed and recorded by the
 adapter rather than trusted from model-authored prose.
 
-The schemas must describe semantic requirements, not command-line flags or a
-shared internal agent graph.
+The portable result contract is canonical; it need not be the exact structured
+output schema passed to every provider. When native schema subsets differ, an
+adapter may derive a provider-compatible emission schema that preserves the
+same required fields and meanings. Normalization back into the canonical
+envelope must be mechanical: an adapter may remove unsupported schema metadata
+or restate an equivalent constraint, but it may not invent findings, evidence,
+gaps, or conclusions.
+
+The exercise retains the exact native emission schema and raw native output,
+binds their digests in launcher evidence, and proves that replaying
+`native output -> canonical result` produces the stored result bytes. The
+schemas describe semantic requirements, not command-line flags or a shared
+internal agent graph.
 
 ## Backend executions
 
@@ -112,6 +123,8 @@ The exercise succeeds only when:
 
 - one unchanged portable work order drives both native backends;
 - both outputs validate against the portable result contract;
+- each native output can be replay-normalized into the exact stored canonical
+  result without semantic enrichment;
 - both receipts bind actual identity, permissions, and output to the same
   immutable input;
 - provider-specific mechanics remain confined to backend profiles;
