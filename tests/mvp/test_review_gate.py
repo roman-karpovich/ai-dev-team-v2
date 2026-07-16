@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -341,6 +342,23 @@ class ReviewGateCliTest(unittest.TestCase):
         }
         manifest_path.write_bytes(alias._encoded(manifest))
         payload = self._run(alias.directory, expected_code=3)
+        self.assertEqual("review_path_invalid", payload["error"]["code"])
+
+        hardlink = BundleBuilder(self.root / "hardlink-alias")
+        hardlink.write()
+        hardlink_path = hardlink.directory / "result-hardlink.json"
+        os.link(
+            hardlink.directory / "results" / "path-alpha.json",
+            hardlink_path,
+        )
+        manifest_path = hardlink.directory / "bundle.json"
+        manifest = json.loads(manifest_path.read_text())
+        manifest["paths"][1]["result"] = {
+            "path": hardlink_path.name,
+            "sha256": manifest["paths"][0]["result"]["sha256"],
+        }
+        manifest_path.write_bytes(hardlink._encoded(manifest))
+        payload = self._run(hardlink.directory, expected_code=3)
         self.assertEqual("review_path_invalid", payload["error"]["code"])
 
     def test_rejects_path_set_and_cross_object_binding_mismatches(self) -> None:
