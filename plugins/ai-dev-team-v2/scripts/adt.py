@@ -1001,6 +1001,7 @@ def _emit(value: dict[str, Any], stream: Any) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    arguments: argparse.Namespace | None = None
     try:
         arguments = build_parser().parse_args(argv)
         result = dispatch(arguments)
@@ -1031,12 +1032,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 130
     except Exception:
+        message = (
+            "The review gate failed before it could produce a verdict."
+            if arguments is not None and arguments.command == "review-gate"
+            else "The command failed before it could update task state."
+        )
         _emit(
             {
                 "ok": False,
                 "error": {
                     "code": "internal_error",
-                    "message": "The command failed before it could update task state.",
+                    "message": message,
                 },
             },
             sys.stderr,
