@@ -176,6 +176,16 @@ subagents, workflows, tools, or project instructions.
    its domain membership is material and unresolved, inspect the available
    evidence or ask one focused owner decision before adding defensive behavior.
 
+   When a removed, deprecated, or unavailable upstream value is replaced by a
+   local derivation, treat semantic equivalence as a load-bearing factual
+   invariant. Establish what the upstream value included and excluded from
+   authoritative upstream specification, source, or targeted history
+   independently of the candidate formula and tests. Tests that mirror the
+   derivation do not
+   establish equivalence. If equivalence cannot be established or the semantics
+   differ, pause before candidate edits unless the owner explicitly approves the
+   semantic change.
+
    Treat a sibling repository, ignored symlink target, deployment snapshot, or
    runtime configuration outside the selected worktree as external operational
    evidence. Record its provenance and freshness; it is not a verified

@@ -156,6 +156,15 @@ value `unknown` and attach the launcher evidence separately.
   out-of-domain counterexample must not enlarge the accepted contract; report a
   material unsupported or contradicted domain boundary instead of silently
   adding defensive requirements.
+- When a removed, deprecated, or unavailable upstream value is replaced by a
+  local derivation, treat semantic equivalence as a load-bearing factual
+  invariant. Establish what the upstream value included and excluded from
+  authoritative upstream specification, source, or targeted history
+  independently of the candidate formula and tests. Tests that mirror the
+  derivation do not
+  establish equivalence. If equivalence cannot be established or the semantics
+  differ, withhold acceptance unless the owner explicitly approves the semantic
+  change.
 - Inspect correctness, failure behavior, security and data risks,
   architectural fit, compatibility, and maintainability in proportion to the
   change. Check whether tests could pass while the requirement remains broken.
