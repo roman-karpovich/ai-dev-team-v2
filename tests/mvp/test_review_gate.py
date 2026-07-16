@@ -285,6 +285,40 @@ class ReviewGateCliTest(unittest.TestCase):
                 payload = self._run(bundle, expected_code=3)
                 self.assertEqual("review_contract_invalid", payload["error"]["code"])
 
+    def test_rejects_policy_weakening_and_invalid_json_substitutes(self) -> None:
+        weakened = BundleBuilder(self.root / "weakened-independence")
+        weakened.work_order["independence"] = {
+            "fresh_context": False,
+            "prior_results_visible": True,
+        }
+        for receipt in weakened.receipts.values():
+            receipt["independence_observed"] = copy.deepcopy(
+                weakened.work_order["independence"]
+            )
+        weakened.write()
+
+        integer_boolean = BundleBuilder(self.root / "integer-boolean")
+        integer_boolean.work_order["independence"]["fresh_context"] = 1
+        integer_boolean.write()
+
+        uppercase_digest = BundleBuilder(self.root / "uppercase-digest")
+        uppercase_digest.work_order["artifact"]["snapshot_sha256"] = "C" * 64
+        uppercase_digest.write()
+
+        release_upgrade = BundleBuilder(self.root / "release-upgrade")
+        release_upgrade.results["path-alpha"]["release_recommendation"] = "PROCEED"
+        release_upgrade.write()
+
+        for bundle in (
+            weakened.directory,
+            integer_boolean.directory,
+            uppercase_digest.directory,
+            release_upgrade.directory,
+        ):
+            with self.subTest(bundle=bundle.name):
+                payload = self._run(bundle, expected_code=3)
+                self.assertEqual("review_contract_invalid", payload["error"]["code"])
+
     def test_verifies_all_digests_before_parsing_any_result_or_receipt(self) -> None:
         BundleBuilder(self.bundle).write()
         invalid_result = self.bundle / "results" / "path-alpha.json"
