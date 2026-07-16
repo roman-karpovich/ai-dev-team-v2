@@ -28,9 +28,37 @@ surfaces:
 | Root `$schema` meta-schema URI | Not isolated from the initial failure | Rejected | Omit unsupported metadata from the Claude emission schema |
 | Closed objects, required fields, arrays, and enums | Accepted by the successful projection | Accepted by the successful projection | Retain their canonical semantics |
 
-These observations justify small backend projections, not a general schema
-compiler. Provider and runtime versions belong in the invocation evidence for
-each future probe because the accepted subsets may change.
+Together these observations produced one portable subset accepted by both
+surfaces: explicit `type` beside every `const`, with unsupported metadata
+omitted. They justify a pinned common emission shape plus thin native-output
+extractors, not a general schema compiler or separate provider schema trees.
+Provider and runtime versions belong in the invocation evidence for each
+future probe because the accepted subset may change.
+
+## Replay prototype
+
+`native_result_adapter.py` preserves the reusable part of that observation as
+an intentionally narrow spike:
+
+- `project_result_schema` emits the common closed result shape accepted by both
+  observed surfaces. Every `const` has an explicit sibling `type`, and the
+  rejected root `$schema` metadata is omitted.
+- `normalize_result` extracts either a Codex final-output object or Claude's
+  `structured_output`, then delegates validation to the existing review gate,
+  verifies exact work-order/path/snapshot bindings, and emits deterministic
+  JSON bytes. A Claude envelope must itself report a successful terminal
+  result; error wrappers and permission denials fail closed instead of being
+  discarded.
+- Normalization never fills, repairs, or interprets model-authored fields.
+  JSON Schema does not express all gate invariants, so post-extraction contract
+  validation remains mandatory.
+
+The prototype does not launch a process, select a model, inspect Git, enforce a
+sandbox, probe capabilities, infer runtime identity, or issue a receipt. The
+normalizer's surface names describe the two observed native envelope shapes,
+not compatibility with every current or future CLI version. Production
+adoption remains blocked on the rest of this spike's exit criteria and the
+separate snapshot and sandbox decisions.
 
 ## Required evidence
 
