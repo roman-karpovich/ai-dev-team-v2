@@ -181,10 +181,9 @@ subagents, workflows, tools, or project instructions.
    invariant. Establish what the upstream value included and excluded from
    authoritative upstream specification, source, or targeted history
    independently of the candidate formula and tests. Tests that mirror the
-   derivation do not
-   establish equivalence. If equivalence cannot be established or the semantics
-   differ, pause before candidate edits unless the owner explicitly approves the
-   semantic change.
+   derivation do not establish equivalence. If equivalence cannot be established
+   or the semantics differ, pause before candidate edits unless the owner
+   explicitly approves the semantic change.
 
    Treat a sibling repository, ignored symlink target, deployment snapshot, or
    runtime configuration outside the selected worktree as external operational

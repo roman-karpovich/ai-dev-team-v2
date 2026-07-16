@@ -140,8 +140,24 @@ class SkillContractTest(unittest.TestCase):
             self.develop.index(trigger),
             self.develop.index('adt --workspace "$workspace" start'),
         )
-        self.assertIn("pause before candidate edits", self.develop)
-        self.assertIn("withhold acceptance", self.review)
+        develop_rule_start = self.develop.index(trigger)
+        develop_rule_end = self.develop.index(
+            "treat a sibling repository",
+            develop_rule_start,
+        )
+        review_rule_start = self.review.index(trigger)
+        review_rule_end = self.review.index(
+            "inspect correctness, failure behavior",
+            review_rule_start,
+        )
+        self.assertIn(
+            "pause before candidate edits",
+            self.develop[develop_rule_start:develop_rule_end],
+        )
+        self.assertIn(
+            "withhold acceptance",
+            self.review[review_rule_start:review_rule_end],
+        )
 
     def test_develop_contract_keeps_clear_work_low_ceremony(self) -> None:
         for surface in (self.develop, self.usage):
