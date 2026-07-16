@@ -529,10 +529,11 @@ The checked-in contract is
 referenced exact-byte digest before parsing model results, validates closed
 work-order, result, and launcher-receipt shapes, checks cross-object bindings,
 and emits only `REPORT_ONLY` or `HOLD`. `REPORT_ONLY` is not acceptance or
-release approval. The command does not launch reviewers, prove the launcher's
-attestations, adjudicate findings, or authorize release. The bundle manifest
-provides integrity after composition, not authenticity against an actor able
-to reseal it.
+release approval. `HOLD` remains structured JSON on stdout, but sets `ok: false`
+and exits 5 so shell automation stops. The command does not launch reviewers,
+prove the launcher's attestations, adjudicate findings, or authorize release.
+The bundle manifest provides integrity after composition, not authenticity
+against an actor able to reseal it.
 
 ## What to evaluate
 

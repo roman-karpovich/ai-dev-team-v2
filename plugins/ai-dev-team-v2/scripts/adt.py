@@ -25,6 +25,7 @@ SCHEMA_VERSION = 2
 SNAPSHOT_FORMAT_VERSION = 2
 STATE_NAMESPACE = "ai-dev-team"
 OPEN_STATUSES = frozenset({"active", "paused"})
+REVIEW_HOLD_EXIT_CODE = 5
 
 
 class CliError(Exception):
@@ -907,7 +908,7 @@ def command_review_gate(arguments: argparse.Namespace) -> dict[str, Any]:
         result = review_gate.evaluate_bundle(Path(arguments.bundle))
     except review_gate.ReviewGateError as error:
         raise CliError(error.code, error.message) from error
-    return {"ok": True, "command": "review-gate", **result}
+    return {"ok": result["verdict"] == "REPORT_ONLY", "command": "review-gate", **result}
 
 
 def build_parser() -> JsonArgumentParser:
@@ -1002,7 +1003,10 @@ def _emit(value: dict[str, Any], stream: Any) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     try:
         arguments = build_parser().parse_args(argv)
-        _emit(dispatch(arguments), sys.stdout)
+        result = dispatch(arguments)
+        _emit(result, sys.stdout)
+        if arguments.command == "review-gate" and result["verdict"] == "HOLD":
+            return REVIEW_HOLD_EXIT_CODE
         return 0
     except CliError as error:
         _emit(

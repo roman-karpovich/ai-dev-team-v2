@@ -200,7 +200,7 @@ class ReviewGateCliTest(unittest.TestCase):
             result.returncode,
             msg=f"stdout={result.stdout!r}\nstderr={result.stderr!r}",
         )
-        return json.loads(result.stdout if expected_code == 0 else result.stderr)
+        return json.loads(result.stdout or result.stderr)
 
     def test_happy_bundle_is_order_independent_and_deterministic(self) -> None:
         first = BundleBuilder(self.bundle)
@@ -456,7 +456,8 @@ class ReviewGateCliTest(unittest.TestCase):
         unknown = BundleBuilder(self.root / "identity-unknown")
         unknown.receipts["path-alpha"]["identity"]["model"] = "UNKNOWN"
         unknown.write()
-        payload = self._run(unknown.directory)
+        payload = self._run(unknown.directory, expected_code=5)
+        self.assertFalse(payload["ok"])
         self.assertEqual("HOLD", payload["verdict"])
         self.assertIn("path-alpha:IDENTITY_UNQUALIFIED", payload["reason_codes"])
 
@@ -476,7 +477,8 @@ class ReviewGateCliTest(unittest.TestCase):
             (evidence.directory, "path-alpha:REQUIRED_EVIDENCE_MISSING"),
         ):
             with self.subTest(bundle=bundle.name):
-                payload = self._run(bundle)
+                payload = self._run(bundle, expected_code=5)
+                self.assertFalse(payload["ok"])
                 self.assertEqual("HOLD", payload["verdict"])
                 self.assertIn(reason, payload["reason_codes"])
 
@@ -533,7 +535,8 @@ class ReviewGateCliTest(unittest.TestCase):
             mutate(builder)
             builder.write()
             with self.subTest(label=label):
-                payload = self._run(builder.directory)
+                payload = self._run(builder.directory, expected_code=5)
+                self.assertFalse(payload["ok"])
                 self.assertEqual("HOLD", payload["verdict"])
                 self.assertIn(reason, payload["reason_codes"])
                 self.assertNotIn("PROCEED", json.dumps(payload))

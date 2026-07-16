@@ -201,6 +201,11 @@ has exactly these result fields plus the CLI success envelope:
 `path_ids` and `reason_codes` are sorted; no timestamp or generated ID is
 added. Path declaration order therefore cannot change the output.
 
+`REPORT_ONLY` sets `ok: true` and exits zero. A valid `HOLD` is written to
+stdout with `ok: false` and exits 5, so shell automation cannot mistake a
+blocker for a passed gate. Structural input errors remain JSON errors on stderr
+and use their nonzero error exit.
+
 `REPORT_ONLY` requires every path to be `COMPLETED`, within its declared wall
 budget, fully identified, capability-complete, evidence-complete, independent
 as requested, and free of findings, gaps, or degradations. Otherwise the
