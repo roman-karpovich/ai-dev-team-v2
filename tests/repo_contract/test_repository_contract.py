@@ -55,7 +55,10 @@ class RepositoryContractTest(unittest.TestCase):
         )
 
         release_version = claude["version"]
-        self.assertEqual(release_version, codex["version"].split("+", 1)[0])
+        codex_release, separator, codex_cachebuster = codex["version"].partition("+")
+        self.assertEqual(release_version, codex_release)
+        self.assertEqual("+", separator)
+        self.assertRegex(codex_cachebuster, r"^codex\.\d{14}$")
         self.assertEqual(release_version, marketplace["plugins"][0]["version"])
 
     def test_host_plugin_identity_and_marketplace_sources_are_symmetric(self) -> None:
