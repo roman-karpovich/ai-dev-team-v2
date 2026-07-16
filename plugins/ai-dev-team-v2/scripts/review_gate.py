@@ -248,7 +248,6 @@ def _read_references(
 
     bundle_root = bundle_directory.resolve()
     raw_by_path: dict[str, bytes] = {}
-    resolved_targets: set[Path] = set()
     file_identities: set[tuple[int, int]] = set()
     mismatches: list[str] = []
     for reference in references:
@@ -272,12 +271,6 @@ def _read_references(
             ) from error
         if not resolved.is_file():
             _fail("review_path_invalid", "A bundle reference is not a regular file.")
-        if resolved in resolved_targets:
-            _fail(
-                "review_path_invalid",
-                "Bundle references must resolve to unique target files.",
-            )
-        resolved_targets.add(resolved)
         try:
             metadata = resolved.stat()
         except OSError as error:

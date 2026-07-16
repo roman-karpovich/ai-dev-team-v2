@@ -225,6 +225,8 @@ v0 deliberately does not:
 - sign or durably store the bundle;
 - compare reviewer conclusions or adjudicate findings;
 - turn a clean report into a release authorization;
+- support filesystems that cannot provide stable local file identities for
+  duplicate-reference detection;
 - provide a general schema engine or workflow format.
 
 Those capabilities require backend adapters, sandbox and snapshot evidence,
