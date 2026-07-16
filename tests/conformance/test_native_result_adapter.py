@@ -80,6 +80,8 @@ class NativeResultAdapterTest(unittest.TestCase):
         self.assertNotIn("$schema", schema)
         self.assertEqual(set(self.result), set(schema["properties"]))
         self.assertEqual(set(self.result), set(schema["required"]))
+        self.assertNotIn("minLength", json.dumps(schema))
+        self.assertNotIn("minItems", json.dumps(schema))
 
         constants: list[dict[str, object]] = []
 
@@ -99,6 +101,7 @@ class NativeResultAdapterTest(unittest.TestCase):
 
     def test_normalizes_both_native_surfaces_to_identical_bytes(self) -> None:
         result = self.result_for("codex-native")
+        result["evidence"][0]["observation"] = "Inspected π and \ud800."
         codex_raw = json.dumps(result, separators=(",", ":")).encode()
         claude_raw = json.dumps(
             {
@@ -138,6 +141,29 @@ class NativeResultAdapterTest(unittest.TestCase):
                 b'{"structured_output":{},"structured_output":{}}',
             ),
             ("claude-print-v0", b'{"type":"result"}'),
+            (
+                "claude-print-v0",
+                json.dumps(
+                    {
+                        "is_error": False,
+                        "structured_output": self.result,
+                        "subtype": "success",
+                        "type": "result",
+                    }
+                ).encode(),
+            ),
+            (
+                "claude-print-v0",
+                json.dumps(
+                    {
+                        "is_error": False,
+                        "permission_denials": {},
+                        "structured_output": self.result,
+                        "subtype": "success",
+                        "type": "result",
+                    }
+                ).encode(),
+            ),
             (
                 "claude-print-v0",
                 json.dumps(

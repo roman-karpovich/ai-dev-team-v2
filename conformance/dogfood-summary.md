@@ -47,12 +47,11 @@ exercised where applicable.
   could only report `unknown`. Runtime/model provenance therefore belongs to
   launcher-owned execution evidence after conclusions are fixed, not model
   self-report or the requested model name.
-- One initial structured-output schema failed differently across the native
+- One shared structured-output schema failed differently across the native
   surfaces: Codex required an explicit sibling `type` for a `const`, while
-  Claude rejected the root `$schema` meta-schema URI. The corrected common
-  subset used typed constants without that optional metadata and worked on
-  both; only their native result envelopes required separate mechanical
-  extraction before the same closed canonical validation.
+  Claude rejected the root `$schema` meta-schema URI. Small provider-compatible
+  emission schemas were necessary; both still normalized into the same closed
+  canonical result contract.
 - Provider permission modes silently blocked declared localhost Docker checks
   in otherwise valid review runs. The successful boundary put provider prompt
   bypass inside an external OS sandbox, kept the artifact read-only, and left
