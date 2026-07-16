@@ -49,9 +49,10 @@ exercised where applicable.
   self-report or the requested model name.
 - One shared structured-output schema failed differently across the native
   surfaces: Codex required an explicit sibling `type` for a `const`, while
-  Claude rejected the root `$schema` meta-schema URI. Small provider-compatible
-  emission schemas were necessary; both still normalized into the same closed
-  canonical result contract.
+  Claude rejected the root `$schema` meta-schema URI. Separate compatible
+  emission schemas were used in that run and both normalized into the same
+  closed canonical result contract; the run did not isolate whether separate
+  schema documents were strictly necessary.
 - Provider permission modes silently blocked declared localhost Docker checks
   in otherwise valid review runs. The successful boundary put provider prompt
   bypass inside an external OS sandbox, kept the artifact read-only, and left

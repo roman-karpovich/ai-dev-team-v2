@@ -45,7 +45,15 @@ class NativeResultAdapterError(ValueError):
 
 
 def _encoded(value: object) -> bytes:
-    return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
+    try:
+        return (
+            json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8", errors="strict")
+    except UnicodeEncodeError as error:
+        raise NativeResultAdapterError(
+            "native_output_invalid",
+            "Normalized JSON contains an unpaired Unicode surrogate.",
+        ) from error
 
 
 def _surface(value: str) -> str:
@@ -75,7 +83,7 @@ def _context(work_order_raw: bytes, path_id: str) -> tuple[dict[str, Any], str]:
 
 def _constant(value: str) -> dict[str, str]:
     # Codex rejected a const without its sibling type. Keeping the redundant
-    # type is semantics-preserving and was accepted by both observed surfaces.
+    # type is the candidate common projection; Claude acceptance remains a probe.
     return {"const": value, "type": "string"}
 
 
@@ -148,7 +156,7 @@ def _result_schema(
 
 
 def project_result_schema(work_order_raw: bytes, path_id: str) -> bytes:
-    """Return the common provider-compatible schema for one declared path."""
+    """Return the candidate common emission schema for one declared path."""
     work_order, work_order_sha256 = _context(work_order_raw, path_id)
     return _encoded(_result_schema(work_order, work_order_sha256, path_id))
 

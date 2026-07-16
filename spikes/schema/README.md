@@ -57,6 +57,19 @@ an intentionally narrow spike:
   semantic implementation. Production promotion requires a supported module
   boundary; the focused parity tests make private-API drift visible meanwhile.
 
+The candidate emission schema intentionally uses only the structured-output
+constructs already isolated in the compatibility matrix. Non-blank strings,
+minimum array cardinality, uniqueness, and cross-reference validity remain
+mandatory in post-extraction canonical validation until their native schema
+support is probed. This weakens only the early emission filter, not the accepted
+portable result contract.
+
+For this spike, canonical bytes mean UTF-8 JSON with sorted keys, two-space
+indentation, one trailing newline, and unescaped non-ASCII characters. Unpaired
+Unicode surrogates and non-UTF-8 native input fail closed. This is an adapter
+output convention for replay; v0 does not impose it on independently assembled
+bundle files.
+
 The prototype does not launch a process, select a model, inspect Git, enforce a
 sandbox, probe capabilities, infer runtime identity, or issue a receipt. The
 normalizer's surface names describe the two observed native envelope shapes,
@@ -74,8 +87,8 @@ separate snapshot and sandbox decisions.
 - implementation LOC, test LOC, review surface, and measured runtime;
 - identical accept/reject results across candidates for the preregistered
   fixtures.
-- retained native schemas and raw outputs that replay through each adapter to
-  the exact canonical result bytes, including negative cases where
+- retained native schemas, raw outputs, and adapter-produced canonical bytes
+  whose digests reproduce on replay, including negative cases where
   normalization cannot preserve required semantics.
 
 ## Exit criteria

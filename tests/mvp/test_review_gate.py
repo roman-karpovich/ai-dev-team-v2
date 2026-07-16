@@ -592,6 +592,16 @@ class ReviewGateCliTest(unittest.TestCase):
 
         self.assertEqual("review_json_invalid", payload["error"]["code"])
 
+    def test_rejects_non_utf8_json(self) -> None:
+        for encoding in ("utf-16", "utf-32"):
+            bundle = self.root / encoding
+            bundle.mkdir()
+            (bundle / "bundle.json").write_bytes("{}".encode(encoding))
+
+            with self.subTest(encoding=encoding):
+                payload = self._run(bundle, expected_code=3)
+                self.assertEqual("review_json_invalid", payload["error"]["code"])
+
     def test_duplicate_json_object_key_is_invalid(self) -> None:
         BundleBuilder(self.bundle).write()
         manifest_path = self.bundle / "bundle.json"
