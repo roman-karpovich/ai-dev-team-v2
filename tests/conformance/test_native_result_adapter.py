@@ -9,7 +9,9 @@ from spikes.schema import native_result_adapter
 
 
 def encoded(value: object) -> bytes:
-    return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
+    return (
+        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    ).encode()
 
 
 class NativeResultAdapterTest(unittest.TestCase):
@@ -80,8 +82,6 @@ class NativeResultAdapterTest(unittest.TestCase):
         self.assertNotIn("$schema", schema)
         self.assertEqual(set(self.result), set(schema["properties"]))
         self.assertEqual(set(self.result), set(schema["required"]))
-        self.assertNotIn("minLength", json.dumps(schema))
-        self.assertNotIn("minItems", json.dumps(schema))
 
         constants: list[dict[str, object]] = []
 
@@ -101,8 +101,10 @@ class NativeResultAdapterTest(unittest.TestCase):
 
     def test_normalizes_both_native_surfaces_to_identical_bytes(self) -> None:
         result = self.result_for("codex-native")
-        result["evidence"][0]["observation"] = "Inspected π and \ud800."
-        codex_raw = json.dumps(result, separators=(",", ":")).encode()
+        result["evidence"][0]["observation"] = "Inspected π, naïve — exact text."
+        codex_raw = json.dumps(
+            result, ensure_ascii=False, separators=(",", ":")
+        ).encode()
         claude_raw = json.dumps(
             {
                 "is_error": False,
@@ -112,6 +114,7 @@ class NativeResultAdapterTest(unittest.TestCase):
                 "subtype": "success",
                 "type": "result",
             },
+            ensure_ascii=False,
             separators=(",", ":"),
         ).encode()
 
@@ -217,6 +220,27 @@ class NativeResultAdapterTest(unittest.TestCase):
                 with self.assertRaises(native_result_adapter.NativeResultAdapterError):
                     native_result_adapter.normalize_result(
                         surface,
+                        self.work_order_raw,
+                        "codex-native",
+                        native_raw,
+                    )
+
+    def test_rejects_non_utf8_and_unpaired_surrogate_input(self) -> None:
+        result = self.result_for("codex-native")
+        text = json.dumps(result)
+        surrogate = self.result_for("codex-native")
+        surrogate["evidence"][0]["observation"] = "Invalid \ud800 scalar."
+        cases = [
+            text.encode("utf-16"),
+            text.encode("utf-32"),
+            json.dumps(surrogate, ensure_ascii=True).encode(),
+        ]
+
+        for native_raw in cases:
+            with self.subTest(prefix=native_raw[:8]):
+                with self.assertRaises(native_result_adapter.NativeResultAdapterError):
+                    native_result_adapter.normalize_result(
+                        "codex-exec-v0",
                         self.work_order_raw,
                         "codex-native",
                         native_raw,

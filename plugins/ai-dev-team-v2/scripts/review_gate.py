@@ -203,7 +203,8 @@ def _strict_json_loads(raw: bytes, location: str) -> Any:
         return result
 
     try:
-        return json.loads(raw, object_pairs_hook=reject_duplicate_keys)
+        text = raw.decode("utf-8", errors="strict")
+        return json.loads(text, object_pairs_hook=reject_duplicate_keys)
     except ReviewGateError:
         raise
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
