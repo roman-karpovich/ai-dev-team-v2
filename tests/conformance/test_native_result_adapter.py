@@ -109,12 +109,14 @@ class NativeResultAdapterTest(unittest.TestCase):
     def test_normalizes_both_native_surfaces_to_identical_bytes(self) -> None:
         result = self.result_for("codex-native")
         result["evidence"][0]["observation"] = "Inspected π, naïve — exact text."
+        integer_limit = int("9" * 512)
         codex_raw = json.dumps(
             result, ensure_ascii=False, separators=(",", ":")
         ).encode()
         claude_raw = json.dumps(
             {
                 "ignored": "😀",
+                "ignored_integer_boundaries": [integer_limit, -integer_limit],
                 "is_error": False,
                 "modelUsage": {"claude-opus-4-8": {"outputTokens": 100}},
                 "permission_denials": [],
@@ -289,7 +291,10 @@ class NativeResultAdapterTest(unittest.TestCase):
             '"ignored": 0', '"ignored": 1e9999'
         )
         oversized_integer = json.dumps({**wrapper, "ignored": 0}).replace(
-            '"ignored": 0', f'"ignored": {"9" * 5000}'
+            '"ignored": 0', f'"ignored": {"9" * 513}'
+        )
+        oversized_negative_integer = json.dumps({**wrapper, "ignored": 0}).replace(
+            '"ignored": 0', f'"ignored": -{"9" * 513}'
         )
         cases = [
             ("codex-exec-v0", text.encode("utf-16")),
@@ -310,6 +315,7 @@ class NativeResultAdapterTest(unittest.TestCase):
             ),
             ("claude-print-v0", overflow.encode()),
             ("claude-print-v0", oversized_integer.encode()),
+            ("claude-print-v0", oversized_negative_integer.encode()),
         ]
 
         for surface, native_raw in cases:
