@@ -55,6 +55,9 @@ print(json.dumps({
 PY
     ;;
   "plugin marketplace upgrade ai-dev-team-v2-local")
+    if [[ "$FAKE_CODEX_MODE" == "upgrade-failure" ]]; then
+      exit 6
+    fi
     touch "$FAKE_CODEX_STATE/upgraded"
     ;;
   "plugin list --json")
@@ -197,21 +200,37 @@ set -euo pipefail
 
 case "$*" in
   "plugin marketplace list --json")
-    printf '[{"name":"ai-dev-team-v2-local"}]\\n'
+    python3 - <<'PY'
+import json
+import os
+
+print(json.dumps([{
+    "name": "ai-dev-team-v2-local",
+    "source": os.environ["FAKE_CLAUDE_MARKETPLACE_SOURCE"],
+    "path": os.environ["FAKE_CLAUDE_MARKETPLACE_ROOT"],
+    "installLocation": os.environ["FAKE_CLAUDE_MARKETPLACE_ROOT"],
+}]))
+PY
     ;;
   "plugin list --json")
     python3 - <<'PY'
 import json
 import os
 
-print(json.dumps([{
+version = os.environ["FAKE_CLAUDE_VERSION"]
+if os.environ["FAKE_CLAUDE_MODE"] == "wrong-version":
+    version = version + ".stale"
+item = {
     "id": "ai-dev-team@ai-dev-team-v2-local",
-    "version": "0.1.29",
     "installPath": os.environ["FAKE_CLAUDE_INSTALL_ROOT"],
-}]))
+}
+if os.environ["FAKE_CLAUDE_MODE"] != "missing-version":
+    item["version"] = version
+print(json.dumps([item]))
 PY
     ;;
   "plugin update ai-dev-team@ai-dev-team-v2-local")
+    touch "$FAKE_CLAUDE_STATE/updated"
     ;;
   *)
     echo "unexpected fake Claude invocation: $*" >&2
@@ -296,13 +315,27 @@ esac
             check=False,
         )
 
-    def run_claude_installer(self) -> subprocess.CompletedProcess[str]:
+    def run_claude_installer(
+        self,
+        *,
+        mode: str = "matching",
+        marketplace_root: Path = ROOT,
+        marketplace_source: str = "directory",
+    ) -> subprocess.CompletedProcess[str]:
+        plugin_version = json.loads(
+            (PLUGIN_SOURCE / ".claude-plugin/plugin.json").read_text()
+        )["version"]
         environment = os.environ.copy()
         environment.update(
             {
                 "HOME": str(self.home),
                 "PATH": f"{self.bin}:{environment['PATH']}",
                 "FAKE_CLAUDE_INSTALL_ROOT": str(self.install_root),
+                "FAKE_CLAUDE_MARKETPLACE_ROOT": str(marketplace_root),
+                "FAKE_CLAUDE_MARKETPLACE_SOURCE": marketplace_source,
+                "FAKE_CLAUDE_MODE": mode,
+                "FAKE_CLAUDE_STATE": str(self.state),
+                "FAKE_CLAUDE_VERSION": plugin_version,
             }
         )
         return subprocess.run(
@@ -533,6 +566,19 @@ esac
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue((self.state / "upgraded").is_file())
 
+    def test_git_marketplace_refresh_failure_propagates(self) -> None:
+        snapshot = self.root / "marketplace-snapshot"
+        snapshot.mkdir()
+
+        result = self.run_installer(
+            mode="upgrade-failure",
+            marketplace_root=snapshot,
+            marketplace_type="git",
+        )
+
+        self.assertEqual(result.returncode, 6, result.stderr)
+        self.assertFalse(self.install_root.exists())
+
     def test_different_local_marketplace_is_not_reconfigured_implicitly(self) -> None:
         other_checkout = self.root / "other-checkout"
         other_checkout.mkdir()
@@ -545,6 +591,46 @@ esac
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("does not point to this checkout", result.stderr)
         self.assertFalse((self.state / "upgraded").exists())
+
+    def test_different_claude_marketplace_is_not_used(self) -> None:
+        other_checkout = self.root / "other-checkout"
+        other_checkout.mkdir()
+
+        marketplace_result = self.run_claude_installer(
+            marketplace_root=other_checkout,
+        )
+
+        self.assertNotEqual(marketplace_result.returncode, 0)
+        self.assertIn(
+            "Claude marketplace ai-dev-team-v2-local does not point to this checkout",
+            marketplace_result.stderr,
+        )
+        self.assertFalse((self.state / "updated").exists())
+
+    def test_non_directory_claude_marketplace_is_not_used(self) -> None:
+        marketplace_result = self.run_claude_installer(
+            marketplace_source="github",
+        )
+
+        self.assertNotEqual(marketplace_result.returncode, 0)
+        self.assertIn(
+            "Claude marketplace ai-dev-team-v2-local does not use a local "
+            "directory source",
+            marketplace_result.stderr,
+        )
+        self.assertFalse((self.state / "updated").exists())
+
+    def test_claude_plugin_version_is_verified(self) -> None:
+        for mode in ("wrong-version", "missing-version"):
+            with self.subTest(mode=mode):
+                self.copy_writable_plugin()
+                version_result = self.run_claude_installer(mode=mode)
+
+                self.assertNotEqual(version_result.returncode, 0)
+                self.assertIn(
+                    "Claude reported installed version",
+                    version_result.stderr,
+                )
 
     def test_codex_install_rejects_missing_or_stale_cache(self) -> None:
         expectations = {
