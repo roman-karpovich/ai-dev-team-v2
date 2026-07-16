@@ -511,7 +511,12 @@ class ReviewGateCliTest(unittest.TestCase):
                 "Required evidence for the in-scope generated-code claim is missing."
             ]
 
-        def degradation(builder: BundleBuilder) -> None:
+        def result_degradation(builder: BundleBuilder) -> None:
+            builder.results["path-alpha"]["degradations"] = [
+                "A focused test check required by this run was skipped."
+            ]
+
+        def receipt_degradation(builder: BundleBuilder) -> None:
             builder.receipts["path-alpha"]["degradations"] = [
                 "A focused test check required by this run was skipped."
             ]
@@ -534,7 +539,16 @@ class ReviewGateCliTest(unittest.TestCase):
         cases = (
             ("finding", finding, "path-alpha:FINDINGS_PRESENT"),
             ("gap", gap, "path-alpha:GAPS_PRESENT"),
-            ("degradation", degradation, "path-alpha:DEGRADATIONS_PRESENT"),
+            (
+                "result-degradation",
+                result_degradation,
+                "path-alpha:DEGRADATIONS_PRESENT",
+            ),
+            (
+                "receipt-degradation",
+                receipt_degradation,
+                "path-alpha:DEGRADATIONS_PRESENT",
+            ),
             ("incomplete", incomplete, "path-alpha:TERMINAL_CANCELLED"),
             ("budget", budget, "path-alpha:BUDGET_EXCEEDED"),
             ("independence", independence, "path-alpha:INDEPENDENCE_NOT_ESTABLISHED"),
