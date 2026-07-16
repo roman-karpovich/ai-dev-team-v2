@@ -8,18 +8,28 @@ output through the existing review-gate validator.
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
-import sys
 from pathlib import Path
 from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PLUGIN_SCRIPTS = ROOT / "plugins" / "ai-dev-team-v2" / "scripts"
-if str(PLUGIN_SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(PLUGIN_SCRIPTS))
+REVIEW_GATE = ROOT / "plugins" / "ai-dev-team-v2" / "scripts" / "review_gate.py"
 
-import review_gate  # noqa: E402
+
+def _load_review_gate() -> Any:
+    specification = importlib.util.spec_from_file_location(
+        "adt_schema_spike_review_gate", REVIEW_GATE
+    )
+    if specification is None or specification.loader is None:
+        raise RuntimeError("The review-gate validator cannot be loaded.")
+    module = importlib.util.module_from_spec(specification)
+    specification.loader.exec_module(module)
+    return module
+
+
+review_gate = _load_review_gate()
 
 
 CODEX_SURFACE = "codex-exec-v0"
@@ -35,9 +45,7 @@ class NativeResultAdapterError(ValueError):
 
 
 def _encoded(value: object) -> bytes:
-    return (
-        json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-    ).encode()
+    return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode()
 
 
 def _surface(value: str) -> str:
@@ -74,7 +82,7 @@ def _constant(value: str) -> dict[str, str]:
 def _result_schema(
     work_order: dict[str, Any], work_order_sha256: str, path_id: str
 ) -> dict[str, Any]:
-    text = {"minLength": 1, "type": "string"}
+    text = {"type": "string"}
     evidence = {
         "additionalProperties": False,
         "properties": {
@@ -90,7 +98,6 @@ def _result_schema(
         "properties": {
             "evidence_refs": {
                 "items": text,
-                "minItems": 1,
                 "type": "array",
             },
             "id": text,
@@ -163,8 +170,14 @@ def _native_result(surface: str, raw: bytes) -> Any:
                 "native_output_invalid",
                 "Claude native output is not a successful result wrapper.",
             )
-        denials = value.get("permission_denials", [])
-        if not isinstance(denials, list) or denials:
+        if "permission_denials" not in value or not isinstance(
+            value["permission_denials"], list
+        ):
+            raise NativeResultAdapterError(
+                "native_output_invalid",
+                "Claude native output has invalid permission-denial status.",
+            )
+        if value["permission_denials"]:
             raise NativeResultAdapterError(
                 "native_output_degraded",
                 "Claude native output reports permission denials.",

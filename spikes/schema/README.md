@@ -28,21 +28,22 @@ surfaces:
 | Root `$schema` meta-schema URI | Not isolated from the initial failure | Rejected | Omit unsupported metadata from the Claude emission schema |
 | Closed objects, required fields, arrays, and enums | Accepted by the successful projection | Accepted by the successful projection | Retain their canonical semantics |
 
-Together these observations produced one portable subset accepted by both
-surfaces: explicit `type` beside every `const`, with unsupported metadata
-omitted. They justify a pinned common emission shape plus thin native-output
-extractors, not a general schema compiler or separate provider schema trees.
-Provider and runtime versions belong in the invocation evidence for each
-future probe because the accepted subset may change.
+Together these observations suggest a candidate portable subset: explicit
+`type` beside every `const`, with unsupported metadata omitted. They justify
+testing one common emission shape plus thin native-output extractors before
+adding a general schema compiler or separate provider schema trees. They do
+not prove that the identical candidate document was accepted by both surfaces.
+Provider and runtime versions belong in the invocation evidence for each probe
+because the accepted subset may change.
 
 ## Replay prototype
 
 `native_result_adapter.py` preserves the reusable part of that observation as
 an intentionally narrow spike:
 
-- `project_result_schema` emits the common closed result shape accepted by both
-  observed surfaces. Every `const` has an explicit sibling `type`, and the
-  rejected root `$schema` metadata is omitted.
+- `project_result_schema` emits the candidate common closed result shape. Every
+  `const` has an explicit sibling `type`, the rejected root `$schema` metadata
+  is omitted, and stricter semantic checks stay in the canonical validator.
 - `normalize_result` extracts either a Codex final-output object or Claude's
   `structured_output`, then delegates validation to the existing review gate,
   verifies exact work-order/path/snapshot bindings, and emits deterministic
@@ -52,6 +53,9 @@ an intentionally narrow spike:
 - Normalization never fills, repairs, or interprets model-authored fields.
   JSON Schema does not express all gate invariants, so post-extraction contract
   validation remains mandatory.
+- The spike reuses the gate's private validation functions to avoid a second
+  semantic implementation. Production promotion requires a supported module
+  boundary; the focused parity tests make private-API drift visible meanwhile.
 
 The prototype does not launch a process, select a model, inspect Git, enforce a
 sandbox, probe capabilities, infer runtime identity, or issue a receipt. The
