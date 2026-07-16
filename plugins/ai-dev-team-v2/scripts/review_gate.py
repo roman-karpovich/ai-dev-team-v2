@@ -249,6 +249,7 @@ def _read_references(
     bundle_root = bundle_directory.resolve()
     raw_by_path: dict[str, bytes] = {}
     resolved_targets: set[Path] = set()
+    file_identities: set[tuple[int, int]] = set()
     mismatches: list[str] = []
     for reference in references:
         relative_text = reference["path"]
@@ -277,6 +278,20 @@ def _read_references(
                 "Bundle references must resolve to unique target files.",
             )
         resolved_targets.add(resolved)
+        try:
+            metadata = resolved.stat()
+        except OSError as error:
+            raise ReviewGateError(
+                "review_bundle_unreadable",
+                "A referenced bundle file could not be inspected.",
+            ) from error
+        file_identity = (metadata.st_dev, metadata.st_ino)
+        if file_identity in file_identities:
+            _fail(
+                "review_path_invalid",
+                "Bundle references must identify unique regular files.",
+            )
+        file_identities.add(file_identity)
         try:
             raw = resolved.read_bytes()
         except OSError as error:
