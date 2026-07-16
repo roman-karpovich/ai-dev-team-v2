@@ -58,6 +58,33 @@ class RepositoryContractTest(unittest.TestCase):
         self.assertEqual(release_version, codex["version"].split("+", 1)[0])
         self.assertEqual(release_version, marketplace["plugins"][0]["version"])
 
+    def test_host_plugin_identity_and_marketplace_sources_are_symmetric(self) -> None:
+        codex = json.loads(
+            (ROOT / "plugins/ai-dev-team-v2/.codex-plugin/plugin.json").read_text()
+        )
+        claude = json.loads(
+            (ROOT / "plugins/ai-dev-team-v2/.claude-plugin/plugin.json").read_text()
+        )
+        claude_marketplace = json.loads(
+            (ROOT / ".claude-plugin/marketplace.json").read_text()
+        )
+        codex_marketplace = json.loads(
+            (ROOT / ".agents/plugins/marketplace.json").read_text()
+        )
+
+        plugin_name = claude["name"]
+        self.assertEqual(plugin_name, codex["name"])
+        self.assertEqual(plugin_name, claude_marketplace["plugins"][0]["name"])
+        self.assertEqual(plugin_name, codex_marketplace["plugins"][0]["name"])
+        self.assertEqual(claude_marketplace["name"], codex_marketplace["name"])
+        self.assertEqual(
+            claude_marketplace["plugins"][0]["source"],
+            codex_marketplace["plugins"][0]["source"]["path"],
+        )
+        self.assertEqual(
+            "local", codex_marketplace["plugins"][0]["source"]["source"]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
