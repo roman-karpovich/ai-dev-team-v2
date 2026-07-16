@@ -223,6 +223,14 @@ class ReviewGateCliTest(unittest.TestCase):
         BundleBuilder(second_bundle).write(manifest_path_order=["path-alpha", "path-beta"])
         self.assertEqual(output_one, self._run(second_bundle))
 
+        allowed_network = BundleBuilder(self.root / "allowed-network")
+        allowed_network.work_order["permissions"]["network"] = "ALLOW"
+        for receipt in allowed_network.receipts.values():
+            receipt["permissions_observed"]["network"] = "ALLOW"
+        allowed_network.receipts["path-alpha"]["timing"]["elapsed_ms"] = 120000
+        allowed_network.write()
+        self.assertEqual("REPORT_ONLY", self._run(allowed_network.directory)["verdict"])
+
     def test_rejects_unknown_fields_at_representative_nesting_levels(self) -> None:
         cases = []
 
@@ -348,7 +356,23 @@ class ReviewGateCliTest(unittest.TestCase):
         terminal.receipts["path-alpha"]["terminal_status"] = "FAILED"
         terminal.write()
 
-        for bundle in (path_set.directory, binding.directory, terminal.directory):
+        permission = BundleBuilder(self.root / "permission")
+        permission.receipts["path-alpha"]["permissions_observed"]["network"] = "ALLOW"
+        permission.write()
+
+        invocation = BundleBuilder(self.root / "invocation")
+        invocation.receipts["path-beta"]["invocation_id"] = invocation.receipts[
+            "path-alpha"
+        ]["invocation_id"]
+        invocation.write()
+
+        for bundle in (
+            path_set.directory,
+            binding.directory,
+            terminal.directory,
+            permission.directory,
+            invocation.directory,
+        ):
             with self.subTest(bundle=bundle.name):
                 payload = self._run(bundle, expected_code=3)
                 self.assertEqual("review_binding_mismatch", payload["error"]["code"])
