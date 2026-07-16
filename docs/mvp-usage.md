@@ -496,6 +496,7 @@ adt --workspace PATH handoff --host codex --lease LEASE_ID --to claude
 adt --workspace PATH resume --host claude
 adt --workspace PATH resume --host claude --accept-drift
 adt --workspace PATH complete --host claude --lease LEASE_ID --summary TEXT
+adt review-gate --bundle BUNDLE_DIRECTORY
 ```
 
 Use `codex` or `claude` for host-valued arguments. Commands return JSON on
@@ -513,6 +514,25 @@ against a local process that deliberately reads Git's private state.
 In this MVP, `kind` and `profile` are durable intent labels only. They do not
 yet auto-route models, spend quota, or mechanically enforce different review
 gates.
+
+## Validate a cold-review evidence bundle
+
+The experimental conformance slice can validate a manually assembled bundle
+without a Git worktree or ADT task state:
+
+```bash
+adt review-gate --bundle ./review-bundle
+```
+
+The checked-in contract is
+`conformance/portable-cold-review-contract-v0.md`. The command verifies every
+referenced exact-byte digest before parsing model results, validates closed
+work-order, result, and launcher-receipt shapes, checks cross-object bindings,
+and emits only `REPORT_ONLY` or `HOLD`. `REPORT_ONLY` is not acceptance or
+release approval. The command does not launch reviewers, prove the launcher's
+attestations, adjudicate findings, or authorize release. The bundle manifest
+provides integrity after composition, not authenticity against an actor able
+to reseal it.
 
 ## What to evaluate
 
