@@ -37,7 +37,7 @@ class NativeResultAdapterTest(unittest.TestCase):
             "permissions": {"filesystem": "READ_ONLY", "network": "DENY"},
             "budget": {"wall_seconds": 120},
             "required_capabilities": ["SOURCE_INSPECTION", "TEST_EXECUTION"],
-            "required_evidence": ["candidate-inspection"],
+            "required_evidence": ["candidate-inspection", "focused-tests"],
             "independence": {
                 "fresh_context": True,
                 "prior_results_visible": False,
@@ -88,6 +88,15 @@ class NativeResultAdapterTest(unittest.TestCase):
         )
         self.assertFalse(
             schema["properties"]["findings"]["items"]["additionalProperties"]
+        )
+        self.assertEqual(
+            {
+                "enum": self.work_order["required_evidence"],
+                "type": "string",
+            },
+            schema["properties"]["evidence"]["items"]["properties"][
+                "requirement"
+            ],
         )
 
         constants: list[dict[str, object]] = []
@@ -145,6 +154,26 @@ class NativeResultAdapterTest(unittest.TestCase):
                 "codex-native",
                 codex_raw,
             ),
+        )
+
+    def test_projection_keeps_optional_evidence_open_without_required_names(
+        self,
+    ) -> None:
+        work_order = copy.deepcopy(self.work_order)
+        work_order["required_evidence"] = []
+
+        schema = json.loads(
+            native_result_adapter.project_result_schema(
+                encoded(work_order),
+                "codex-native",
+            )
+        )
+
+        self.assertEqual(
+            {"type": "string"},
+            schema["properties"]["evidence"]["items"]["properties"][
+                "requirement"
+            ],
         )
 
     def test_rejects_malformed_native_envelopes_and_unknown_surfaces(self) -> None:

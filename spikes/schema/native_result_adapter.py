@@ -91,12 +91,18 @@ def _result_schema(
     work_order: dict[str, Any], work_order_sha256: str, path_id: str
 ) -> dict[str, Any]:
     text = {"type": "string"}
+    evidence_requirement = text
+    if work_order["required_evidence"]:
+        evidence_requirement = {
+            "enum": work_order["required_evidence"],
+            "type": "string",
+        }
     evidence = {
         "additionalProperties": False,
         "properties": {
             "id": text,
             "observation": text,
-            "requirement": text,
+            "requirement": evidence_requirement,
         },
         "required": ["id", "requirement", "observation"],
         "type": "object",
