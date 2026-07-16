@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, NoReturn
 
@@ -103,6 +104,24 @@ def _sha256(value: Any, location: str) -> str:
         _fail(
             "review_contract_invalid",
             f"{location} must be a lowercase hexadecimal SHA-256 digest.",
+        )
+    return text
+
+
+def _timestamp(value: Any, location: str) -> str:
+    text = _nonblank(value, location)
+    normalized = f"{text[:-1]}+00:00" if text.endswith("Z") else text
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        _fail(
+            "review_contract_invalid",
+            f"{location} must be an ISO 8601 timestamp with an explicit UTC offset.",
+        )
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        _fail(
+            "review_contract_invalid",
+            f"{location} must be an ISO 8601 timestamp with an explicit UTC offset.",
         )
     return text
 
@@ -516,7 +535,7 @@ def _validate_receipt(value: Any, location: str) -> dict[str, Any]:
         _sha256(bindings[key], f"{location}.bindings.{key}")
     _enum(receipt["terminal_status"], TERMINAL_STATUSES, f"{location}.terminal_status")
     timing = _object(receipt["timing"], {"started_at", "elapsed_ms"}, f"{location}.timing")
-    _nonblank(timing["started_at"], f"{location}.timing.started_at")
+    _timestamp(timing["started_at"], f"{location}.timing.started_at")
     _integer(timing["elapsed_ms"], f"{location}.timing.elapsed_ms")
     usage = _object(
         receipt["usage"], {"input_tokens", "output_tokens"}, f"{location}.usage"
