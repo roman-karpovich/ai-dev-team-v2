@@ -131,6 +131,17 @@ Each path has one result object with exactly:
 | `gaps` | String array |
 | `degradations` | String array |
 
+The public producer contract uses `findings`, `gaps`, and `degradations` as
+blocker-only arrays. A finding is an unresolved evidence-backed violation of a
+stated acceptance claim or repository constraint within the accepted domain.
+A gap is missing evidence needed to decide an in-scope claim. A degradation is
+a capability or check required by the current run that was actually lost,
+weakened, or skipped. Accepted non-goals, accepted tradeoffs, explicitly
+unsupported boundaries, and hypothetical limitations or skips of another
+environment belong in evidence or closeout (or existing work-order facts), not
+those blocker-only arrays. Put them in a blocker array only when they contradict
+the accepted contract and are reachable inside the accepted domain.
+
 An evidence object has exactly `id`, `requirement`, and `observation`. Evidence
 IDs are unique within the result. Every name in the work order's
 `required_evidence` must be covered by at least one evidence object's
