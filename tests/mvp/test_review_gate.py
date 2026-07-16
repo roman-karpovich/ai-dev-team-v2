@@ -554,6 +554,26 @@ class ReviewGateCliTest(unittest.TestCase):
         self.assertFalse((non_git / ".git").exists())
         self.assertEqual([], list(self.root.rglob("state.json")))
 
+    def test_internal_review_gate_failure_uses_stateless_diagnostic(self) -> None:
+        standalone = self.root / "standalone-adt.py"
+        standalone.write_bytes(ADT.read_bytes())
+
+        result = subprocess.run(
+            [sys.executable, str(standalone), "review-gate", "--bundle", str(self.bundle)],
+            cwd=self.root,
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+
+        self.assertEqual(4, result.returncode)
+        payload = json.loads(result.stderr)
+        self.assertEqual("internal_error", payload["error"]["code"])
+        self.assertEqual(
+            "The review gate failed before it could produce a verdict.",
+            payload["error"]["message"],
+        )
+
     def test_invalid_json_exits_nonzero(self) -> None:
         self.bundle.mkdir()
         (self.bundle / "bundle.json").write_text("not-json\n")
