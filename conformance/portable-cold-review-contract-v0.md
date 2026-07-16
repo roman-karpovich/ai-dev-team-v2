@@ -238,6 +238,8 @@ v0 deliberately does not:
 - derive or verify the artifact snapshot digest from repository bytes;
 - prove that launcher identity or independence observations are truthful;
 - verify that declared evidence observations correspond to repository facts;
+- retain or bind the raw provider output, native emission schema, or full
+  provider prompt; v0 exact-byte verification ends at the canonical result;
 - hide one result from another by itself;
 - sign or durably store the bundle;
 - compare reviewer conclusions or adjudicate findings;

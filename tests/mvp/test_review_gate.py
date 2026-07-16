@@ -522,6 +522,11 @@ class ReviewGateCliTest(unittest.TestCase):
         def independence(builder: BundleBuilder) -> None:
             builder.receipts["path-alpha"]["independence_observed"]["fresh_context"] = False
 
+        def prior_result_visible(builder: BundleBuilder) -> None:
+            builder.receipts["path-alpha"]["independence_observed"][
+                "prior_results_visible"
+            ] = True
+
         cases = (
             ("finding", finding, "path-alpha:FINDINGS_PRESENT"),
             ("gap", gap, "path-alpha:GAPS_PRESENT"),
@@ -529,6 +534,11 @@ class ReviewGateCliTest(unittest.TestCase):
             ("incomplete", incomplete, "path-alpha:TERMINAL_CANCELLED"),
             ("budget", budget, "path-alpha:BUDGET_EXCEEDED"),
             ("independence", independence, "path-alpha:INDEPENDENCE_NOT_ESTABLISHED"),
+            (
+                "prior-result-visible",
+                prior_result_visible,
+                "path-alpha:INDEPENDENCE_NOT_ESTABLISHED",
+            ),
         )
         for label, mutate, reason in cases:
             builder = BundleBuilder(self.root / label)

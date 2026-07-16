@@ -1,6 +1,6 @@
 # Sandbox spike
 
-- Status: Active
+- Status: Queued; dogfood prerequisites established
 - Production mechanism decision: Not yet made
 
 Demonstrate that child processes cannot access the network, sensitive
