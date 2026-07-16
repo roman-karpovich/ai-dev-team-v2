@@ -57,6 +57,56 @@ has_codex_marketplace_name() {
     | grep -Fxq "$name"
 }
 
+codex_marketplace_metadata() {
+  local name="${1:-$marketplace}"
+  codex plugin marketplace list --json \
+    | python3 -c '
+import json
+import sys
+
+name = sys.argv[1]
+items = json.load(sys.stdin).get("marketplaces", [])
+for item in items:
+    if item.get("name") == name:
+        source_type = item.get("marketplaceSource", {}).get("sourceType", "")
+        root = item.get("root", "")
+        print(source_type + "\t" + root)
+        raise SystemExit(0)
+raise SystemExit(1)
+' "$name"
+}
+
+refresh_codex_marketplace() {
+  local source_type
+  local configured_root
+  local configured_realpath
+  local repo_realpath
+  IFS=$'\t' read -r source_type configured_root < <(codex_marketplace_metadata)
+
+  if [[ "$source_type" == "git" ]]; then
+    codex plugin marketplace upgrade "$marketplace"
+    return 0
+  fi
+
+  if [[ "$source_type" != "local" ]]; then
+    echo "Codex marketplace $marketplace has unsupported source type: $source_type" >&2
+    return 1
+  fi
+
+  configured_realpath="$(cd "$configured_root" 2>/dev/null && pwd -P || true)"
+  repo_realpath="$(cd "$repo_root" && pwd -P)"
+
+  if [[ "$configured_realpath" == "$repo_realpath" ]]; then
+    return 0
+  fi
+
+  echo "Codex marketplace $marketplace does not point to this checkout" >&2
+  echo "configured: $configured_root" >&2
+  echo "expected: $repo_root" >&2
+  echo "remove the marketplace explicitly before changing its source" >&2
+  return 1
+}
+
 has_claude_marketplace() {
   claude plugin marketplace list --json \
     | python3 -c '
@@ -108,9 +158,66 @@ verify_claude_install() {
     echo "Claude reported an invalid install path for $plugin@$marketplace" >&2
     return 1
   fi
-  if ! diff -qr -x __pycache__ -x '*.pyc' "$source" "$installed" >/dev/null; then
+  if ! diff -qr -x __pycache__ -x '*.pyc' -x .codex-plugin \
+    "$source" "$installed" >/dev/null; then
     echo "Claude's cached plugin does not match the local source" >&2
     echo "bump the plugin version in both Claude manifests, then reinstall" >&2
+    return 1
+  fi
+}
+
+codex_manifest_version() {
+  python3 -c '
+import json
+import sys
+
+with open(sys.argv[1]) as manifest:
+    print(json.load(manifest)["version"])
+' "$repo_root/plugins/$plugin_dir/.codex-plugin/plugin.json"
+}
+
+codex_plugin_install_path() {
+  local expected_id="$plugin@$marketplace"
+  local expected_version
+  expected_version="$(codex_manifest_version)"
+
+  python3 -c '
+import json
+import sys
+
+expected_id = sys.argv[1]
+expected_version = sys.argv[2]
+result = json.load(sys.stdin)
+
+plugin_id = result.get("pluginId")
+if plugin_id != expected_id:
+    raise SystemExit(
+        f"Codex installed plugin {plugin_id!r}, expected {expected_id!r}"
+    )
+
+version = result.get("version")
+if version != expected_version:
+    raise SystemExit(
+        f"Codex installed version {version}, but local source requires "
+        f"{expected_version}"
+    )
+
+print(result.get("installedPath", ""))
+' "$expected_id" "$expected_version"
+}
+
+verify_codex_install() {
+  local source="$repo_root/plugins/$plugin_dir"
+  local installed="$1"
+
+  if [[ ! -d "$installed" ]]; then
+    echo "Codex reported an invalid install path for $plugin@$marketplace" >&2
+    return 1
+  fi
+  if ! diff -qr -x __pycache__ -x '*.pyc' -x .claude-plugin \
+    "$source" "$installed" >/dev/null; then
+    echo "Codex's cached plugin does not match the local source" >&2
+    echo "refresh the marketplace, bump the Codex build metadata, then reinstall" >&2
     return 1
   fi
 }
@@ -186,6 +293,9 @@ remove_claude_v1() {
 }
 
 install_codex() {
+  local install_result
+  local installed
+
   command -v codex >/dev/null 2>&1 || {
     echo "codex is not installed" >&2
     return 1
@@ -193,12 +303,16 @@ install_codex() {
 
   if ! has_codex_marketplace; then
     codex plugin marketplace add "$repo_root"
+  else
+    refresh_codex_marketplace
   fi
-  codex plugin add "$plugin@$marketplace"
+  install_result="$(codex plugin add "$plugin@$marketplace" --json)"
   if ! has_codex_plugin "$plugin@$marketplace"; then
     echo "Codex did not report $plugin@$marketplace as installed" >&2
     return 1
   fi
+  installed="$(printf '%s\n' "$install_result" | codex_plugin_install_path)"
+  verify_codex_install "$installed"
 }
 
 install_claude() {
