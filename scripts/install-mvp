@@ -177,15 +177,19 @@ def inventory(root, ignored_manifest):
         with os.scandir(directory) as entries:
             for entry in entries:
                 relative = entry.name if not prefix else f"{prefix}/{entry.name}"
-                if entry.name == "__pycache__" or entry.name.endswith(".pyc"):
-                    continue
-
                 mode = entry.stat(follow_symlinks=False).st_mode
-                if relative == ignored_manifest and not stat.S_ISDIR(mode):
+                if relative == ignored_manifest and stat.S_ISREG(mode):
+                    continue
+                parents = relative.split("/")[:-1]
+                if (
+                    "__pycache__" in parents
+                    and entry.name.endswith(".pyc")
+                    and stat.S_ISREG(mode)
+                ):
                     continue
                 if stat.S_ISDIR(mode):
-                    if relative == ignored_manifest:
-                        result[relative] = ("directory",)
+                    # Empty directories are not distributable payload, but walk
+                    # them so every material descendant remains visible.
                     pending.append((entry.path, relative))
                 elif stat.S_ISREG(mode):
                     result[relative] = (
@@ -204,8 +208,9 @@ def inventory(root, ignored_manifest):
 try:
     source = inventory(sys.argv[1], sys.argv[3])
     installed = inventory(sys.argv[2], sys.argv[3])
-except OSError:
-    raise SystemExit(1)
+except OSError as error:
+    print(f"plugin payload verification failed: {error}", file=sys.stderr)
+    raise SystemExit(2)
 
 raise SystemExit(0 if source == installed else 1)
 PY
@@ -214,16 +219,23 @@ PY
 verify_claude_install() {
   local source="$repo_root/plugins/$plugin_dir"
   local installed
+  local payload_status=0
   installed="$(claude_plugin_install_path)"
 
   if [[ ! -d "$installed" ]]; then
     echo "Claude reported an invalid install path for $plugin@$marketplace" >&2
     return 1
   fi
-  if ! plugin_payloads_match \
-    "$source" "$installed" ".codex-plugin/plugin.json"; then
+  plugin_payloads_match \
+    "$source" "$installed" ".codex-plugin/plugin.json" || payload_status=$?
+  if [[ "$payload_status" -eq 1 ]]; then
     echo "Claude's cached plugin does not match the local source" >&2
     echo "bump the plugin version in both Claude manifests, then reinstall" >&2
+    return 1
+  fi
+  if [[ "$payload_status" -ne 0 ]]; then
+    echo "Claude's cached plugin could not be verified" >&2
+    echo "fix payload access or remove unsupported entries, then reinstall" >&2
     return 1
   fi
 }
@@ -271,15 +283,22 @@ print(result.get("installedPath", ""))
 verify_codex_install() {
   local source="$repo_root/plugins/$plugin_dir"
   local installed="$1"
+  local payload_status=0
 
   if [[ ! -d "$installed" ]]; then
     echo "Codex reported an invalid install path for $plugin@$marketplace" >&2
     return 1
   fi
-  if ! plugin_payloads_match \
-    "$source" "$installed" ".claude-plugin/plugin.json"; then
+  plugin_payloads_match \
+    "$source" "$installed" ".claude-plugin/plugin.json" || payload_status=$?
+  if [[ "$payload_status" -eq 1 ]]; then
     echo "Codex's cached plugin does not match the local source" >&2
     echo "ensure the marketplace contains this checkout and uses a fresh Codex version, then reinstall" >&2
+    return 1
+  fi
+  if [[ "$payload_status" -ne 0 ]]; then
+    echo "Codex's cached plugin could not be verified" >&2
+    echo "fix payload access or remove unsupported entries, then reinstall" >&2
     return 1
   fi
 }
