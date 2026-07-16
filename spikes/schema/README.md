@@ -18,9 +18,9 @@ A general self-written schema framework is out of scope.
 
 ## Observed native compatibility
 
-The first two-provider cold-review run disproved the assumption that one JSON
-Schema document could be handed unchanged to both native structured-output
-surfaces:
+The first two-provider cold-review run showed that the original shared JSON
+Schema document was not accepted unchanged by both native structured-output
+surfaces. It did not isolate whether a corrected common document would work:
 
 | Construct | Codex-native observation | Claude-native observation | Portable decision |
 | --- | --- | --- | --- |
@@ -66,13 +66,14 @@ portable result contract.
 
 For this spike, canonical bytes mean UTF-8 JSON with sorted keys, two-space
 indentation, one trailing newline, and unescaped non-ASCII characters. Unpaired
-Unicode surrogates, non-standard or non-finite numeric values, and non-UTF-8
-native input fail closed before envelope extraction, including when they appear
-in metadata the adapter would otherwise discard. Exact replay bytes are the
-output of this spike's `_encoded` function; a future independent producer must
-qualify against retained byte fixtures rather than infer an encoding from this
-prose. This is an adapter output convention for replay; v0 does not impose it
-on independently assembled bundle files.
+Unicode surrogates, non-standard or non-finite numeric values, oversized integer
+literals, and non-UTF-8 native input fail closed before envelope extraction,
+including when they appear in metadata the adapter would otherwise discard.
+Exact replay bytes are the output of this spike's `_encoded` function; a future
+independent producer must qualify against retained byte fixtures rather than
+infer an encoding from this prose. The v0 bundle contract separately requires
+UTF-8 input, but does not impose the adapter's sorting, indentation, escaping,
+or trailing-newline convention on independently assembled bundle files.
 
 The prototype does not launch a process, select a model, inspect Git, enforce a
 sandbox, probe capabilities, infer runtime identity, or issue a receipt. The

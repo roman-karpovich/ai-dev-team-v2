@@ -9,14 +9,16 @@ the experimental review gate. It does not launch a model, choose a provider,
 write task state, adjudicate findings, or authorize release. The only normal
 verdicts are `REPORT_ONLY` and `HOLD`.
 
-All JSON objects are closed: every listed field is required and unlisted fields
-are invalid. Duplicate object fields are invalid JSON for this contract. All
-strings described as text are non-blank. IDs and other string arrays contain
-unique non-blank strings. Integer counts are non-negative and booleans are JSON
-booleans, not integer substitutes. Every SHA-256 value is 64 lowercase
-hexadecimal characters. File-reference digests cover the exact referenced
-bytes. The artifact snapshot digest is an externally produced identifier that
-v0 binds across the work order, results, and receipts but does not recompute.
+All JSON documents are UTF-8 without a byte-order mark. JSON objects are closed:
+every listed field is required and unlisted fields are invalid. Duplicate
+object fields are invalid JSON for this contract. All strings described as text
+are non-blank. IDs and other string arrays contain unique non-blank strings.
+Integer tokens contain at most 512 decimal digits excluding an optional minus
+sign; integer counts are non-negative, and booleans are JSON booleans rather
+than integer substitutes. Every SHA-256 value is 64 lowercase hexadecimal
+characters. File-reference digests cover the exact referenced bytes. The
+artifact snapshot digest is an externally produced identifier that v0 binds
+across the work order, results, and receipts but does not recompute.
 
 ## Bundle layout and integrity
 

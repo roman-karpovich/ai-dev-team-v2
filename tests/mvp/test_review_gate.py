@@ -608,6 +608,7 @@ class ReviewGateCliTest(unittest.TestCase):
             "infinity": b'{"ignored":Infinity}',
             "negative-infinity": b'{"ignored":-Infinity}',
             "overflow": b'{"ignored":1e9999}',
+            "oversized-integer": ('{"ignored":' + "9" * 5000 + "}").encode(),
             "surrogate-value": b'{"ignored":"\\ud800"}',
             "surrogate-key": b'{"\\ud800":null}',
         }

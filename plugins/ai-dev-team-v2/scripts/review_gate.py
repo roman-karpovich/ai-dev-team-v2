@@ -22,6 +22,7 @@ TERMINAL_STATUSES = frozenset(
 )
 SEVERITIES = frozenset({"CRITICAL", "HIGH", "MEDIUM", "LOW"})
 UNQUALIFIED_IDENTITIES = frozenset({"unknown", "unspecified", "unavailable"})
+MAX_JSON_INTEGER_DIGITS = 512
 
 
 class ReviewGateError(Exception):
@@ -192,6 +193,15 @@ def _reference(value: Any, location: str) -> dict[str, str]:
 
 
 def _strict_json_loads(raw: bytes, location: str) -> Any:
+    def parse_integer(value: str) -> int:
+        digits = value[1:] if value.startswith("-") else value
+        if len(digits) > MAX_JSON_INTEGER_DIGITS:
+            _fail(
+                "review_json_invalid",
+                f"{location} contains an oversized integer literal.",
+            )
+        return int(value)
+
     def reject_nonstandard_constant(_: str) -> NoReturn:
         _fail(
             "review_json_invalid",
@@ -215,10 +225,11 @@ def _strict_json_loads(raw: bytes, location: str) -> Any:
             text,
             object_pairs_hook=reject_duplicate_keys,
             parse_constant=reject_nonstandard_constant,
+            parse_int=parse_integer,
         )
     except ReviewGateError:
         raise
-    except (RecursionError, UnicodeDecodeError, json.JSONDecodeError) as error:
+    except (RecursionError, ValueError) as error:
         raise ReviewGateError(
             "review_json_invalid", f"{location} is not valid UTF-8 JSON."
         ) from error

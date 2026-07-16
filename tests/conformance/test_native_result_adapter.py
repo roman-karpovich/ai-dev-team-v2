@@ -288,6 +288,9 @@ class NativeResultAdapterTest(unittest.TestCase):
         overflow = json.dumps({**wrapper, "ignored": 0}).replace(
             '"ignored": 0', '"ignored": 1e9999'
         )
+        oversized_integer = json.dumps({**wrapper, "ignored": 0}).replace(
+            '"ignored": 0', f'"ignored": {"9" * 5000}'
+        )
         cases = [
             ("codex-exec-v0", text.encode("utf-16")),
             ("codex-exec-v0", text.encode("utf-32")),
@@ -306,6 +309,7 @@ class NativeResultAdapterTest(unittest.TestCase):
                 json.dumps(ignored_surrogate_key, ensure_ascii=True).encode(),
             ),
             ("claude-print-v0", overflow.encode()),
+            ("claude-print-v0", oversized_integer.encode()),
         ]
 
         for surface, native_raw in cases:
@@ -344,6 +348,16 @@ class NativeResultAdapterTest(unittest.TestCase):
 
         self.assertEqual("review_contract_invalid", projected.exception.code)
         self.assertEqual("review_contract_invalid", normalized.exception.code)
+
+    def test_rejects_review_path_absent_from_work_order(self) -> None:
+        with self.assertRaises(
+            native_result_adapter.NativeResultAdapterError
+        ) as raised:
+            native_result_adapter.project_result_schema(
+                self.work_order_raw, "undeclared-path"
+            )
+
+        self.assertEqual("review_path_unknown", raised.exception.code)
 
     def test_rejects_invalid_results_and_binding_mismatches(self) -> None:
         dangling = self.result_for("codex-native")
