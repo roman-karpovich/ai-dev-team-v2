@@ -14,7 +14,9 @@ are invalid. Duplicate object fields are invalid JSON for this contract. All
 strings described as text are non-blank. IDs and other string arrays contain
 unique non-blank strings. Integer counts are non-negative and booleans are JSON
 booleans, not integer substitutes. Every SHA-256 value is 64 lowercase
-hexadecimal characters and covers the exact referenced file bytes.
+hexadecimal characters. File-reference digests cover the exact referenced
+bytes. The artifact snapshot digest is an externally produced identifier that
+v0 binds across the work order, results, and receipts but does not recompute.
 
 ## Bundle layout and integrity
 
@@ -91,8 +93,8 @@ The referenced work order is provider-neutral and has exactly these fields:
 
 - `repository_id`, `base_revision`, and `candidate_revision` as non-blank
   identifiers;
-- `snapshot_sha256`, binding every result and receipt to the declared immutable
-  input;
+- `snapshot_sha256`, the declared immutable-input identifier that every result
+  and receipt must repeat exactly;
 - `paths`, a possibly empty string array. Empty means the whole artifact is in
   scope.
 
@@ -167,9 +169,9 @@ Each path has one launcher-authored receipt object with exactly:
 
 `bindings` has exactly `work_order_sha256`, `artifact_snapshot_sha256`, and
 `result_sha256`; all must match the verified files and work order. `timing` has
-exactly a non-blank `started_at` and non-negative `elapsed_ms`. `usage` has
-exactly `input_tokens` and `output_tokens`, each a non-negative integer or
-`null`.
+exactly an ISO 8601 `started_at` with an explicit UTC offset and a non-negative
+`elapsed_ms`. `usage` has exactly `input_tokens` and `output_tokens`, each a
+non-negative integer or `null`.
 
 Observed permissions must exactly match requested permissions. Missing required
 capabilities produce `HOLD`. Identity, permission, terminal-status, object-ID,
@@ -219,6 +221,8 @@ with JSON on stderr. They never become normal success. The gate never emits
 v0 deliberately does not:
 
 - launch or cancel a native backend;
+- define or probe a backend `CapabilityManifest`;
+- derive or verify the artifact snapshot digest from repository bytes;
 - prove that launcher identity or independence observations are truthful;
 - verify that declared evidence observations correspond to repository facts;
 - hide one result from another by itself;

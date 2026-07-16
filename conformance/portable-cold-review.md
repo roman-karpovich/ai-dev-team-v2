@@ -1,6 +1,7 @@
 # Portable cold-review conformance exercise
 
-- Status: Active; bundle validation slice implemented, backend runs pending
+- Status: Active; bundle validation slice implemented, capability contract and
+  backend runs pending
 - Scope: Readiness evidence, not production orchestration
 
 ## Question
@@ -16,7 +17,8 @@ qualify either path as epistemically independent.
 The experimental bundle and gate contract is fixed in
 `portable-cold-review-contract-v0.md`. It validates manually assembled evidence
 without launching a backend or authorizing release. The remaining exercise is
-to produce those artifacts through two qualified native paths.
+to define and probe backend capabilities, then produce the artifacts through
+two qualified native paths.
 
 ## Fixed input
 

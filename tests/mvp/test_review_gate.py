@@ -285,6 +285,20 @@ class ReviewGateCliTest(unittest.TestCase):
                 payload = self._run(bundle, expected_code=3)
                 self.assertEqual("review_contract_invalid", payload["error"]["code"])
 
+    def test_rejects_unparseable_or_offsetless_receipt_start_time(self) -> None:
+        cases = (
+            ("unparseable-start", "not-a-timestamp"),
+            ("offsetless-start", "2026-07-16T10:00:00"),
+        )
+
+        for label, started_at in cases:
+            builder = BundleBuilder(self.root / label)
+            builder.receipts["path-alpha"]["timing"]["started_at"] = started_at
+            builder.write()
+            with self.subTest(label=label):
+                payload = self._run(builder.directory, expected_code=3)
+                self.assertEqual("review_contract_invalid", payload["error"]["code"])
+
     def test_rejects_policy_weakening_and_invalid_json_substitutes(self) -> None:
         weakened = BundleBuilder(self.root / "weakened-independence")
         weakened.work_order["independence"] = {
