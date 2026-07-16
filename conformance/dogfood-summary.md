@@ -1,6 +1,6 @@
 # Development and review dogfood summary
 
-- Date: 2026-07-15
+- Date: 2026-07-16
 - Status: Manual evidence from real tasks; not statistical model qualification
 - Scope: AI Dev Team contract behavior, not production rollout approval
 
@@ -47,6 +47,27 @@ exercised where applicable.
   could only report `unknown`. Runtime/model provenance therefore belongs to
   launcher-owned execution evidence after conclusions are fixed, not model
   self-report or the requested model name.
+- One shared structured-output schema failed differently across the native
+  surfaces: Codex required an explicit sibling `type` for a `const`, while
+  Claude rejected the root `$schema` meta-schema URI. Small provider-compatible
+  emission schemas were necessary; both still normalized into the same closed
+  canonical result contract.
+- Provider permission modes silently blocked declared localhost Docker checks
+  in otherwise valid review runs. The successful boundary put provider prompt
+  bypass inside an external OS sandbox, kept the artifact read-only, and left
+  only isolated scratch and result locations writable. Same-owner `chmod` was
+  rejected as insufficient enforcement.
+- Independent review exposed an order-dependent false green in a query-count
+  fixture: an earlier test had primed one-time middleware state. Running the
+  target alone and in reverse order made that hidden dependency visible and
+  led to an explicit fixture setup.
+- Review paths sharing an output directory were treated as
+  independence-compromised even without proof that one path had read the other.
+  Separate result locations had to exist before launch and be mutually
+  unreadable until both conclusions were fixed.
+- Django checks that shared a test database collided when launched in parallel.
+  The launcher serialized those commands and recorded the lost parallelism as
+  an execution concern rather than weakening the checks.
 - An execution's failure to follow an already explicit contract was repaired
   under the same release. It did not automatically create another rule or
   workflow artifact.
