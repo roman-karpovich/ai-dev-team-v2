@@ -80,8 +80,15 @@ class NativeResultAdapterTest(unittest.TestCase):
         )
 
         self.assertNotIn("$schema", schema)
+        self.assertFalse(schema["additionalProperties"])
         self.assertEqual(set(self.result), set(schema["properties"]))
         self.assertEqual(set(self.result), set(schema["required"]))
+        self.assertFalse(
+            schema["properties"]["evidence"]["items"]["additionalProperties"]
+        )
+        self.assertFalse(
+            schema["properties"]["findings"]["items"]["additionalProperties"]
+        )
 
         constants: list[dict[str, object]] = []
 
@@ -107,6 +114,7 @@ class NativeResultAdapterTest(unittest.TestCase):
         ).encode()
         claude_raw = json.dumps(
             {
+                "ignored": "😀",
                 "is_error": False,
                 "modelUsage": {"claude-opus-4-8": {"outputTokens": 100}},
                 "permission_denials": [],
@@ -114,7 +122,7 @@ class NativeResultAdapterTest(unittest.TestCase):
                 "subtype": "success",
                 "type": "result",
             },
-            ensure_ascii=False,
+            ensure_ascii=True,
             separators=(",", ":"),
         ).encode()
 
@@ -225,26 +233,117 @@ class NativeResultAdapterTest(unittest.TestCase):
                         native_raw,
                     )
 
-    def test_rejects_non_utf8_and_unpaired_surrogate_input(self) -> None:
+    def test_rejects_each_unsuccessful_claude_terminal_status(self) -> None:
+        valid = {
+            "is_error": False,
+            "permission_denials": [],
+            "structured_output": self.result,
+            "subtype": "success",
+            "type": "result",
+        }
+        mutations = [
+            ("type", None),
+            ("type", "not-a-result"),
+            ("subtype", None),
+            ("subtype", "error_max_turns"),
+            ("is_error", None),
+            ("is_error", True),
+            ("is_error", 0),
+        ]
+
+        for field, value in mutations:
+            wrapper = copy.deepcopy(valid)
+            if value is None:
+                del wrapper[field]
+            else:
+                wrapper[field] = value
+            with self.subTest(field=field, value=value):
+                with self.assertRaises(
+                    native_result_adapter.NativeResultAdapterError
+                ) as raised:
+                    native_result_adapter.normalize_result(
+                        "claude-print-v0",
+                        self.work_order_raw,
+                        "codex-native",
+                        json.dumps(wrapper).encode(),
+                    )
+                self.assertEqual("native_output_invalid", raised.exception.code)
+
+    def test_rejects_nonstandard_json_anywhere_in_native_input(self) -> None:
         result = self.result_for("codex-native")
         text = json.dumps(result)
         surrogate = self.result_for("codex-native")
         surrogate["evidence"][0]["observation"] = "Invalid \ud800 scalar."
+        wrapper = {
+            "is_error": False,
+            "permission_denials": [],
+            "structured_output": result,
+            "subtype": "success",
+            "type": "result",
+        }
+        ignored_nan = {**wrapper, "ignored": float("nan")}
+        ignored_infinity = {**wrapper, "ignored": float("inf")}
+        ignored_surrogate_value = {**wrapper, "ignored": "\ud800"}
+        ignored_surrogate_key = {**wrapper, "\ud800": "ignored"}
+        overflow = json.dumps({**wrapper, "ignored": 0}).replace(
+            '"ignored": 0', '"ignored": 1e9999'
+        )
         cases = [
-            text.encode("utf-16"),
-            text.encode("utf-32"),
-            json.dumps(surrogate, ensure_ascii=True).encode(),
+            ("codex-exec-v0", text.encode("utf-16")),
+            ("codex-exec-v0", text.encode("utf-32")),
+            (
+                "codex-exec-v0",
+                json.dumps(surrogate, ensure_ascii=True).encode(),
+            ),
+            ("claude-print-v0", json.dumps(ignored_nan).encode()),
+            ("claude-print-v0", json.dumps(ignored_infinity).encode()),
+            (
+                "claude-print-v0",
+                json.dumps(ignored_surrogate_value, ensure_ascii=True).encode(),
+            ),
+            (
+                "claude-print-v0",
+                json.dumps(ignored_surrogate_key, ensure_ascii=True).encode(),
+            ),
+            ("claude-print-v0", overflow.encode()),
         ]
 
-        for native_raw in cases:
-            with self.subTest(prefix=native_raw[:8]):
-                with self.assertRaises(native_result_adapter.NativeResultAdapterError):
+        for surface, native_raw in cases:
+            with self.subTest(surface=surface, prefix=native_raw[:8]):
+                with self.assertRaises(
+                    native_result_adapter.NativeResultAdapterError
+                ) as raised:
                     native_result_adapter.normalize_result(
-                        "codex-exec-v0",
+                        surface,
                         self.work_order_raw,
                         "codex-native",
                         native_raw,
                     )
+                self.assertEqual("review_json_invalid", raised.exception.code)
+
+    def test_rejects_invalid_work_order_before_projection_or_normalization(
+        self,
+    ) -> None:
+        invalid = copy.deepcopy(self.work_order)
+        invalid["permissions"]["filesystem"] = "WRITE"
+        invalid_raw = encoded(invalid)
+
+        with self.assertRaises(
+            native_result_adapter.NativeResultAdapterError
+        ) as projected:
+            native_result_adapter.project_result_schema(invalid_raw, "codex-native")
+        with self.assertRaises(
+            native_result_adapter.NativeResultAdapterError
+        ) as normalized:
+            native_result_adapter.normalize_result(
+                "codex-exec-v0",
+                invalid_raw,
+                "codex-native",
+                encoded(self.result),
+            )
+
+        self.assertEqual("review_contract_invalid", projected.exception.code)
+        self.assertEqual("review_contract_invalid", normalized.exception.code)
 
     def test_rejects_invalid_results_and_binding_mismatches(self) -> None:
         dangling = self.result_for("codex-native")
@@ -258,11 +357,10 @@ class NativeResultAdapterTest(unittest.TestCase):
         ]
         unknown = self.result_for("codex-native")
         unknown["invented"] = "value"
-        wrong_path = self.result_for("claude-native")
         missing = self.result_for("codex-native")
         del missing["terminal_status"]
 
-        for result in (dangling, unknown, wrong_path, missing):
+        for result in (dangling, unknown, missing):
             with self.subTest(result=result):
                 native_raw = encoded(result)
                 with self.assertRaises(native_result_adapter.NativeResultAdapterError):
@@ -272,6 +370,31 @@ class NativeResultAdapterTest(unittest.TestCase):
                         "codex-native",
                         native_raw,
                     )
+
+    def test_rejects_each_result_binding_mismatch(self) -> None:
+        cases = {
+            "work_order_id": "different-order",
+            "path_id": "claude-native",
+            "work_order_sha256": "d" * 64,
+            "artifact_snapshot_sha256": "e" * 64,
+        }
+
+        for field, value in cases.items():
+            result = self.result_for("codex-native")
+            result[field] = value
+            with self.subTest(field=field):
+                with self.assertRaises(
+                    native_result_adapter.NativeResultAdapterError
+                ) as raised:
+                    native_result_adapter.normalize_result(
+                        "codex-exec-v0",
+                        self.work_order_raw,
+                        "codex-native",
+                        encoded(result),
+                    )
+                self.assertEqual(
+                    "native_result_binding_mismatch", raised.exception.code
+                )
 
 
 if __name__ == "__main__":

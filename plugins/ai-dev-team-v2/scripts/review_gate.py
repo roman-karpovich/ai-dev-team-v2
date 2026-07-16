@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from datetime import datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, NoReturn
@@ -191,6 +192,12 @@ def _reference(value: Any, location: str) -> dict[str, str]:
 
 
 def _strict_json_loads(raw: bytes, location: str) -> Any:
+    def reject_nonstandard_constant(_: str) -> NoReturn:
+        _fail(
+            "review_json_invalid",
+            f"{location} contains a non-standard numeric value.",
+        )
+
     def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
         result: dict[str, Any] = {}
         for key, value in pairs:
@@ -204,13 +211,40 @@ def _strict_json_loads(raw: bytes, location: str) -> Any:
 
     try:
         text = raw.decode("utf-8", errors="strict")
-        return json.loads(text, object_pairs_hook=reject_duplicate_keys)
+        value = json.loads(
+            text,
+            object_pairs_hook=reject_duplicate_keys,
+            parse_constant=reject_nonstandard_constant,
+        )
     except ReviewGateError:
         raise
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+    except (RecursionError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ReviewGateError(
             "review_json_invalid", f"{location} is not valid UTF-8 JSON."
         ) from error
+
+    pending = [value]
+    while pending:
+        current = pending.pop()
+        if isinstance(current, str):
+            try:
+                current.encode("utf-8", errors="strict")
+            except UnicodeEncodeError as error:
+                raise ReviewGateError(
+                    "review_json_invalid",
+                    f"{location} contains an invalid Unicode scalar.",
+                ) from error
+        elif isinstance(current, float) and not math.isfinite(current):
+            _fail(
+                "review_json_invalid",
+                f"{location} contains a non-finite numeric value.",
+            )
+        elif isinstance(current, list):
+            pending.extend(current)
+        elif isinstance(current, dict):
+            for key, item in current.items():
+                pending.extend((key, item))
+    return value
 
 
 def _load_manifest(bundle_directory: Path) -> dict[str, Any]:

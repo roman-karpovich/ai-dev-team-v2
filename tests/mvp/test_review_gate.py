@@ -602,6 +602,25 @@ class ReviewGateCliTest(unittest.TestCase):
                 payload = self._run(bundle, expected_code=3)
                 self.assertEqual("review_json_invalid", payload["error"]["code"])
 
+    def test_rejects_nonstandard_json_scalars_before_contract_validation(self) -> None:
+        cases = {
+            "nan": b'{"ignored":NaN}',
+            "infinity": b'{"ignored":Infinity}',
+            "negative-infinity": b'{"ignored":-Infinity}',
+            "overflow": b'{"ignored":1e9999}',
+            "surrogate-value": b'{"ignored":"\\ud800"}',
+            "surrogate-key": b'{"\\ud800":null}',
+        }
+
+        for name, raw in cases.items():
+            bundle = self.root / name
+            bundle.mkdir()
+            (bundle / "bundle.json").write_bytes(raw)
+
+            with self.subTest(name=name):
+                payload = self._run(bundle, expected_code=3)
+                self.assertEqual("review_json_invalid", payload["error"]["code"])
+
     def test_duplicate_json_object_key_is_invalid(self) -> None:
         BundleBuilder(self.bundle).write()
         manifest_path = self.bundle / "bundle.json"
