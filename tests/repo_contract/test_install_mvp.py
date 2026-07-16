@@ -90,6 +90,16 @@ PY
     if [[ "$FAKE_CODEX_MODE" == "foreign-manifest" ]]; then
       printf '\\n' >> "$FAKE_CODEX_INSTALL_ROOT/.claude-plugin/plugin.json"
     fi
+    if [[ "$FAKE_CODEX_MODE" == "foreign-manifest-missing" ]]; then
+      rm "$FAKE_CODEX_INSTALL_ROOT/.claude-plugin/plugin.json"
+    fi
+    if [[ "$FAKE_CODEX_MODE" == "foreign-manifest-symlink" ]]; then
+      rm "$FAKE_CODEX_INSTALL_ROOT/.claude-plugin/plugin.json"
+      ln -s plugin.other.json "$FAKE_CODEX_INSTALL_ROOT/.claude-plugin/plugin.json"
+    fi
+    if [[ "$FAKE_CODEX_MODE" == "foreign-directory-missing" ]]; then
+      rm -rf "$FAKE_CODEX_INSTALL_ROOT/.claude-plugin"
+    fi
     if [[ "$FAKE_CODEX_MODE" == "foreign-extra" ]]; then
       mkdir -p "$FAKE_CODEX_INSTALL_ROOT/.claude-plugin/extra"
       printf 'unexpected payload\\n' > "$FAKE_CODEX_INSTALL_ROOT/.claude-plugin/extra/plugin.json"
@@ -102,6 +112,42 @@ PY
     fi
     if [[ "$FAKE_CODEX_MODE" == "owner-only-executable" ]]; then
       chmod 700 "$FAKE_CODEX_INSTALL_ROOT/bin/adt"
+    fi
+    if [[ "$FAKE_CODEX_MODE" == "runtime-cache" ]]; then
+      mkdir -p "$FAKE_CODEX_INSTALL_ROOT/scripts/__pycache__"
+      printf 'ignored bytecode\\n' > "$FAKE_CODEX_INSTALL_ROOT/scripts/__pycache__/extra.pyc"
+    fi
+    if [[ "$FAKE_CODEX_MODE" == "orphan-pyc" ]]; then
+      printf 'unexpected bytecode\\n' > "$FAKE_CODEX_INSTALL_ROOT/orphan.pyc"
+    fi
+    if [[ "$FAKE_CODEX_MODE" == "pyc-directory" ]]; then
+      mkdir "$FAKE_CODEX_INSTALL_ROOT/unexpected.pyc"
+      printf 'unexpected payload\\n' > "$FAKE_CODEX_INSTALL_ROOT/unexpected.pyc/payload.txt"
+    fi
+    if [[ "$FAKE_CODEX_MODE" == "pycache-symlink" ]]; then
+      ln -s develop "$FAKE_CODEX_INSTALL_ROOT/skills/__pycache__"
+    fi
+    if [[ "$FAKE_CODEX_MODE" == "pycache-payload" ]]; then
+      mkdir -p "$FAKE_CODEX_INSTALL_ROOT/scripts/__pycache__"
+      printf 'unexpected payload\\n' > "$FAKE_CODEX_INSTALL_ROOT/scripts/__pycache__/unexpected.txt"
+    fi
+    if [[ "$FAKE_CODEX_MODE" == "type-drift" ]]; then
+      rm "$FAKE_CODEX_INSTALL_ROOT/skills/review/SKILL.md"
+      mkdir "$FAKE_CODEX_INSTALL_ROOT/skills/review/SKILL.md"
+    fi
+    if [[ "$FAKE_CODEX_MODE" == "special-entry" ]]; then
+      mkfifo "$FAKE_CODEX_INSTALL_ROOT/unexpected.fifo"
+    fi
+    if [[ "$FAKE_CODEX_MODE" == "unreadable" ]]; then
+      chmod 000 "$FAKE_CODEX_INSTALL_ROOT/skills/develop/SKILL.md"
+    fi
+    if [[ "$FAKE_CODEX_MODE" == "symlink-target" ]]; then
+      rm "$FAKE_CODEX_INSTALL_ROOT/scripts/payload-link"
+      ln -s review_gate.py "$FAKE_CODEX_INSTALL_ROOT/scripts/payload-link"
+    fi
+    if [[ "$FAKE_CODEX_MODE" == "symlink-type" ]]; then
+      rm "$FAKE_CODEX_INSTALL_ROOT/scripts/payload-link"
+      cp "$FAKE_CODEX_INSTALL_ROOT/scripts/adt.py" "$FAKE_CODEX_INSTALL_ROOT/scripts/payload-link"
     fi
     if [[ "$FAKE_CODEX_MODE" == "wrong-installed-path" ]]; then
       mkdir -p "$FAKE_CODEX_WRONG_INSTALL_ROOT"
@@ -270,10 +316,16 @@ esac
         )
 
     def test_codex_install_is_verified_after_plugin_add(self) -> None:
-        result = self.run_installer(mode="foreign-manifest")
+        for mode in (
+            "foreign-manifest",
+            "foreign-manifest-missing",
+            "foreign-directory-missing",
+        ):
+            with self.subTest(mode=mode):
+                result = self.run_installer(mode=mode)
 
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertTrue(self.install_root.is_dir())
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertTrue(self.install_root.is_dir())
 
     def test_executable_mode_is_normalized_to_owner_semantics(self) -> None:
         result = self.run_installer(mode="owner-only-executable")
@@ -310,6 +362,16 @@ esac
             foreign_manifest_result.stderr,
         )
 
+        self.copy_writable_plugin()
+        shutil.rmtree(self.install_root / ".codex-plugin")
+        foreign_directory_result = self.run_claude_installer()
+
+        self.assertEqual(
+            foreign_directory_result.returncode,
+            0,
+            foreign_directory_result.stderr,
+        )
+
         for relative_path in (
             ".claude-plugin/plugin.json",
             "bin/adt",
@@ -333,25 +395,128 @@ esac
                 )
 
     def test_hosts_ignore_only_the_foreign_manifest(self) -> None:
-        codex_result = self.run_installer(mode="foreign-extra")
+        for mode in (
+            "foreign-extra",
+            "foreign-manifest-symlink",
+        ):
+            with self.subTest(host="codex", mode=mode):
+                codex_result = self.run_installer(mode=mode)
 
-        self.assertNotEqual(codex_result.returncode, 0)
+                self.assertNotEqual(codex_result.returncode, 0)
+                self.assertIn(
+                    "Codex's cached plugin does not match the local source",
+                    codex_result.stderr,
+                )
+
+        for mutation in ("extra", "symlink"):
+            with self.subTest(host="claude", mutation=mutation):
+                self.copy_writable_plugin()
+                foreign_manifest = (
+                    self.install_root / ".codex-plugin/plugin.json"
+                )
+                if mutation == "extra":
+                    foreign_extra = (
+                        self.install_root / ".codex-plugin/extra/plugin.json"
+                    )
+                    foreign_extra.parent.mkdir()
+                    foreign_extra.write_text("unexpected payload\n")
+                elif mutation == "symlink":
+                    foreign_manifest.unlink()
+                    foreign_manifest.symlink_to("plugin.other.json")
+                claude_result = self.run_claude_installer()
+
+                self.assertNotEqual(claude_result.returncode, 0)
+                self.assertIn(
+                    "Claude's cached plugin does not match the local source",
+                    claude_result.stderr,
+                )
+
+    def test_payload_inventory_rejects_structural_drift(self) -> None:
+        result = self.run_installer(mode="type-drift")
+
+        self.assertNotEqual(result.returncode, 0)
         self.assertIn(
             "Codex's cached plugin does not match the local source",
-            codex_result.stderr,
+            result.stderr,
         )
 
-        self.copy_writable_plugin()
-        foreign_extra = self.install_root / ".codex-plugin/extra/plugin.json"
-        foreign_extra.parent.mkdir()
-        foreign_extra.write_text("unexpected payload\n")
+    def test_runtime_cache_exclusions_are_type_scoped(self) -> None:
+        runtime_cache_result = self.run_installer(mode="runtime-cache")
 
-        claude_result = self.run_claude_installer()
+        self.assertEqual(
+            runtime_cache_result.returncode,
+            0,
+            runtime_cache_result.stderr,
+        )
 
-        self.assertNotEqual(claude_result.returncode, 0)
+        for mode in (
+            "orphan-pyc",
+            "pyc-directory",
+            "pycache-symlink",
+            "pycache-payload",
+        ):
+            with self.subTest(mode=mode):
+                result = self.run_installer(mode=mode)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(
+                    "Codex's cached plugin does not match the local source",
+                    result.stderr,
+                )
+
+    def test_symlink_target_and_type_are_verified(self) -> None:
+        symlink_repo = self.root / "symlink-repo"
+        (symlink_repo / "scripts").mkdir(parents=True)
+        shutil.copy2(ROOT / "scripts/install-mvp", symlink_repo / "scripts")
+        shutil.copytree(
+            PLUGIN_SOURCE,
+            symlink_repo / "plugins/ai-dev-team-v2",
+            symlinks=True,
+        )
+        (
+            symlink_repo
+            / "plugins/ai-dev-team-v2/scripts/payload-link"
+        ).symlink_to("adt.py")
+
+        matching_result = self.run_installer(
+            mode="matching",
+            repo_root=symlink_repo,
+        )
+        self.assertEqual(matching_result.returncode, 0, matching_result.stderr)
+
+        for mode in ("symlink-target", "symlink-type"):
+            with self.subTest(mode=mode):
+                result = self.run_installer(mode=mode, repo_root=symlink_repo)
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(
+                    "Codex's cached plugin does not match the local source",
+                    result.stderr,
+                )
+
+    def test_unsupported_payload_entry_fails_with_specific_diagnostic(self) -> None:
+        result = self.run_installer(mode="special-entry")
+
+        self.assertNotEqual(result.returncode, 0)
         self.assertIn(
-            "Claude's cached plugin does not match the local source",
-            claude_result.stderr,
+            "plugin payload verification failed: unsupported plugin entry: "
+            "unexpected.fifo",
+            result.stderr,
+        )
+        self.assertIn(
+            "Codex's cached plugin could not be verified",
+            result.stderr,
+        )
+
+    @unittest.skipIf(os.geteuid() == 0, "root can read chmod-000 fixtures")
+    def test_unreadable_payload_fails_closed(self) -> None:
+        result = self.run_installer(mode="unreadable")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("plugin payload verification failed:", result.stderr)
+        self.assertIn(
+            "Codex's cached plugin could not be verified",
+            result.stderr,
         )
 
     def test_git_marketplace_snapshot_is_refreshed_before_plugin_add(self) -> None:
