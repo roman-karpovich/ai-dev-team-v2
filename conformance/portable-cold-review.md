@@ -1,6 +1,6 @@
 # Portable cold-review conformance exercise
 
-- Status: Planned
+- Status: Active; bundle validation slice implemented, backend runs pending
 - Scope: Readiness evidence, not production orchestration
 
 ## Question
@@ -12,6 +12,11 @@ strengths, while producing comparable, inspectable, snapshot-bound receipts?
 This exercise validates the execution boundary proposed by ADR 0002,
 `Portable assurance, native execution`. It does not rank model quality or
 qualify either path as epistemically independent.
+
+The experimental bundle and gate contract is fixed in
+`portable-cold-review-contract-v0.md`. It validates manually assembled evidence
+without launching a backend or authorizing release. The remaining exercise is
+to produce those artifacts through two qualified native paths.
 
 ## Fixed input
 

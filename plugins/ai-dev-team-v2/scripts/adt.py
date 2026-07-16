@@ -898,6 +898,18 @@ def command_complete(
         )
 
 
+def command_review_gate(arguments: argparse.Namespace) -> dict[str, Any]:
+    # Imported lazily so the task-state CLI remains usable as a standalone
+    # module and review-gate stays independent of Git workspace discovery.
+    import review_gate
+
+    try:
+        result = review_gate.evaluate_bundle(Path(arguments.bundle))
+    except review_gate.ReviewGateError as error:
+        raise CliError(error.code, error.message) from error
+    return {"ok": True, "command": "review-gate", **result}
+
+
 def build_parser() -> JsonArgumentParser:
     parser = JsonArgumentParser(prog="adt")
     parser.add_argument(
@@ -949,10 +961,15 @@ def build_parser() -> JsonArgumentParser:
     complete.add_argument("--host", required=True)
     complete.add_argument("--lease", required=True)
     complete.add_argument("--summary")
+
+    review_gate = subparsers.add_parser("review-gate")
+    review_gate.add_argument("--bundle", required=True)
     return parser
 
 
 def dispatch(arguments: argparse.Namespace) -> dict[str, Any]:
+    if arguments.command == "review-gate":
+        return command_review_gate(arguments)
     workspace = GitWorkspace.discover(Path(arguments.workspace))
     store = StateStore(workspace)
     if arguments.command == "start":
