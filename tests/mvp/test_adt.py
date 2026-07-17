@@ -448,6 +448,7 @@ class AdtCliTest(unittest.TestCase):
 
     def test_persisted_numeric_schema_fields_require_true_integers(self) -> None:
         started = self._start()
+        (self.repo / "app.txt").write_text("changed before checkpoint\n")
         self._adt(
             "checkpoint",
             "--host",
@@ -465,11 +466,20 @@ class AdtCliTest(unittest.TestCase):
                 error, _ = self._adt("status", expected_code=4)
                 self.assertEqual("state_version_unsupported", error["error"]["code"])
 
+        float_revision = copy.deepcopy(baseline)
+        float_revision["revision"] = float(float_revision["revision"])
+        state_path.write_text(json.dumps(float_revision))
+        error, _ = self._adt("status", expected_code=4)
+        self.assertEqual("state_corrupt", error["error"]["code"])
+
         for label, invalid_value in (
             ("snapshot-format-version", True),
             ("snapshot-format-version", 2.0),
             ("checkpoint-sequence", True),
             ("checkpoint-sequence", 1.0),
+            ("snapshot-total", 1.0),
+            ("snapshot-truncated", 0.0),
+            ("fingerprint-size", 1.0),
         ):
             with self.subTest(field=label, value=invalid_value):
                 state_value = copy.deepcopy(baseline)
@@ -480,8 +490,225 @@ class AdtCliTest(unittest.TestCase):
                         task["checkpoints"][0]["snapshot"],
                     ):
                         snapshot["format_version"] = invalid_value
-                else:
+                elif label == "checkpoint-sequence":
                     task["checkpoints"][0]["sequence"] = invalid_value
+                else:
+                    for snapshot in (
+                        task["snapshot"],
+                        task["checkpoints"][0]["snapshot"],
+                    ):
+                        if label == "snapshot-total":
+                            snapshot["changes"]["total"] = invalid_value
+                        elif label == "snapshot-truncated":
+                            snapshot["changes"]["truncated"] = invalid_value
+                        else:
+                            snapshot["changes"]["entries"][0]["worktree"][
+                                "size"
+                            ] = invalid_value
+                state_path.write_text(json.dumps(state_value))
+                error, _ = self._adt("status", expected_code=4)
+                self.assertEqual("state_corrupt", error["error"]["code"])
+
+    def test_snapshot_coherence_ignores_unknown_nested_object_keys(self) -> None:
+        started = self._start()
+        (self.repo / "app.txt").write_text("changed before checkpoint\n")
+        self._adt(
+            "checkpoint",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+        )
+        state_path, baseline = self._stored_state()
+
+        for level in ("snapshot", "changes", "entry", "fingerprint"):
+            with self.subTest(level=level):
+                state_value = copy.deepcopy(baseline)
+                task = state_value["tasks"][0]
+                task_target = task["snapshot"]
+                checkpoint_target = task["checkpoints"][-1]["snapshot"]
+                if level in {"changes", "entry", "fingerprint"}:
+                    task_target = task_target["changes"]
+                    checkpoint_target = checkpoint_target["changes"]
+                if level in {"entry", "fingerprint"}:
+                    task_target = task_target["entries"][0]
+                    checkpoint_target = checkpoint_target["entries"][0]
+                if level == "fingerprint":
+                    task_target = task_target["worktree"]
+                    checkpoint_target = checkpoint_target["worktree"]
+                task_target["future_extension"] = {"source": "task"}
+                checkpoint_target["future_extension"] = {"source": "checkpoint"}
+                state_path.write_text(json.dumps(state_value))
+                status, _ = self._adt("status")
+                self.assertEqual(task["id"], status["task"]["id"])
+
+        state_value = copy.deepcopy(baseline)
+        task = state_value["tasks"][0]
+        task["snapshot"].pop("head")
+        task["checkpoints"][-1]["snapshot"].pop("head")
+        state_path.write_text(json.dumps(state_value))
+        error, _ = self._adt("status", expected_code=4)
+        self.assertEqual("state_corrupt", error["error"]["code"])
+
+    def test_snapshot_coherence_still_compares_all_declared_nested_fields(
+        self,
+    ) -> None:
+        (self.repo / "rename-me.txt").write_text("rename this file\n")
+        self._git("add", "rename-me.txt")
+        self._git("commit", "-qm", "add rename candidate")
+        started = self._start()
+        (self.repo / "app.txt").write_text("changed before checkpoint\n")
+        self._git("mv", "rename-me.txt", "renamed.txt")
+        self._adt(
+            "checkpoint",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+        )
+        state_path, baseline = self._stored_state()
+
+        def entry(snapshot, path):
+            return next(
+                value
+                for value in snapshot["changes"]["entries"]
+                if value["path"] == path
+            )
+
+        def renamed_entry(snapshot):
+            return next(
+                value
+                for value in snapshot["changes"]["entries"]
+                if "R" in value["status"]
+            )
+
+        cases = []
+        changed_digest = copy.deepcopy(baseline)
+        changed_digest["tasks"][0]["snapshot"]["digest"] = (
+            "sha256:" + "0" * 64
+        )
+        cases.append(("snapshot", changed_digest))
+
+        changed_entries = copy.deepcopy(baseline)
+        changes = changed_entries["tasks"][0]["snapshot"]["changes"]
+        changes["entries"].append(copy.deepcopy(changes["entries"][0]))
+        changes["total"] += 1
+        cases.append(("changes", changed_entries))
+
+        changed_path = copy.deepcopy(baseline)
+        changed_path["tasks"][0]["snapshot"]["changes"]["entries"][0][
+            "path"
+        ] = "other.txt"
+        cases.append(("entry", changed_path))
+
+        changed_size = copy.deepcopy(baseline)
+        changed_size["tasks"][0]["snapshot"]["changes"]["entries"][0][
+            "worktree"
+        ]["size"] += 1
+        cases.append(("fingerprint", changed_size))
+
+        changed_head = copy.deepcopy(baseline)
+        changed_head["tasks"][0]["snapshot"]["head"] = None
+        cases.append(("head", changed_head))
+
+        changed_status = copy.deepcopy(baseline)
+        entry(changed_status["tasks"][0]["snapshot"], "app.txt")[
+            "status"
+        ] = "A "
+        cases.append(("entry-status", changed_status))
+
+        changed_index_value = copy.deepcopy(baseline)
+        indexed_entry = entry(
+            changed_index_value["tasks"][0]["snapshot"], "app.txt"
+        )
+        mode, object_id, stage = indexed_entry["index"][0].split(" ")
+        indexed_entry["index"][0] = f"{mode} {'0' * len(object_id)} {stage}"
+        cases.append(("index-value", changed_index_value))
+
+        for label, field, alternative in (
+            ("fingerprint-mode", "mode", "0o777"),
+            ("fingerprint-kind", "kind", "special"),
+            ("fingerprint-sha256", "sha256", "0" * 64),
+        ):
+            state_value = copy.deepcopy(baseline)
+            fingerprint = entry(
+                state_value["tasks"][0]["snapshot"], "app.txt"
+            )["worktree"]
+            if fingerprint[field] == alternative:
+                alternative = {
+                    "mode": "0o666",
+                    "kind": "file",
+                    "sha256": "1" * 64,
+                }[field]
+            fingerprint[field] = alternative
+            cases.append((label, state_value))
+
+        missing_worktree = copy.deepcopy(baseline)
+        entry(missing_worktree["tasks"][0]["snapshot"], "app.txt")[
+            "worktree"
+        ] = None
+        cases.append(("worktree-none", missing_worktree))
+
+        changed_accounting = copy.deepcopy(baseline)
+        changes = changed_accounting["tasks"][0]["snapshot"]["changes"]
+        changes["total"] += 1
+        changes["truncated"] += 1
+        cases.append(("total-truncated", changed_accounting))
+
+        changed_entry_order = copy.deepcopy(baseline)
+        changed_entry_order["tasks"][0]["snapshot"]["changes"][
+            "entries"
+        ].reverse()
+        cases.append(("entry-order", changed_entry_order))
+
+        changed_index_order = copy.deepcopy(baseline)
+        task = changed_index_order["tasks"][0]
+        task_entry = entry(task["snapshot"], "app.txt")
+        checkpoint_entry = entry(task["checkpoints"][-1]["snapshot"], "app.txt")
+        first_item = task_entry["index"][0]
+        mode, object_id, stage = first_item.split(" ")
+        second_stage = "1" if stage != "1" else "2"
+        second_item = f"{mode} {object_id} {second_stage}"
+        task_entry["index"] = [first_item, second_item]
+        checkpoint_entry["index"] = [second_item, first_item]
+        cases.append(("index-order", changed_index_order))
+
+        changed_original_path = copy.deepcopy(baseline)
+        renamed_entry(changed_original_path["tasks"][0]["snapshot"])[
+            "original_path"
+        ] = "different-original.txt"
+        cases.append(("original-path", changed_original_path))
+
+        changed_original_index = copy.deepcopy(baseline)
+        original_entry = renamed_entry(
+            changed_original_index["tasks"][0]["snapshot"]
+        )
+        original_entry["original_index"].append(original_entry["index"][0])
+        cases.append(("original-index", changed_original_index))
+
+        changed_original_worktree = copy.deepcopy(baseline)
+        original_entry = renamed_entry(
+            changed_original_worktree["tasks"][0]["snapshot"]
+        )
+        original_entry["original_worktree"] = copy.deepcopy(
+            original_entry["worktree"]
+        )
+        cases.append(("original-worktree", changed_original_worktree))
+
+        runtime = self._load_runtime()
+        for level, state_value in cases:
+            with self.subTest(level=level):
+                task = state_value["tasks"][0]
+                self.assertTrue(
+                    runtime._valid_snapshot(task["snapshot"]),
+                    msg=f"task snapshot invalid for {level}",
+                )
+                self.assertTrue(
+                    runtime._valid_snapshot(
+                        task["checkpoints"][-1]["snapshot"]
+                    ),
+                    msg=f"checkpoint snapshot invalid for {level}",
+                )
                 state_path.write_text(json.dumps(state_value))
                 error, _ = self._adt("status", expected_code=4)
                 self.assertEqual("state_corrupt", error["error"]["code"])
@@ -1107,6 +1334,39 @@ class AdtCliTest(unittest.TestCase):
         error, _ = self._adt("status", expected_code=4)
         self.assertEqual("state_corrupt", error["error"]["code"])
 
+    def test_drift_accepted_at_index_zero_cannot_wrap_to_trailing_pause(
+        self,
+    ) -> None:
+        started = self._start()
+        self._adt(
+            "pause",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+        )
+        (self.repo / "app.txt").write_text("first drift\n")
+        resumed, _ = self._adt("resume", "--host", "codex", "--accept-drift")
+        (self.repo / "app.txt").write_text("second drift\n")
+        self._adt(
+            "pause",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(resumed),
+        )
+        state_path, state_value = self._stored_state()
+        task = state_value["tasks"][0]
+        drift, trailing_pause = task["checkpoints"][1:]
+        drift["sequence"] = 1
+        trailing_pause["sequence"] = 2
+        drift["previous_digest"] = trailing_pause["snapshot"]["digest"]
+        task["checkpoints"] = [drift, trailing_pause]
+        state_path.write_text(json.dumps(state_value))
+
+        error, _ = self._adt("status", expected_code=4)
+        self.assertEqual("state_corrupt", error["error"]["code"])
+
     def test_revision_lower_bound_includes_unretained_no_drift_resumes(self) -> None:
         started = self._start()
         self._adt(
@@ -1151,6 +1411,27 @@ class AdtCliTest(unittest.TestCase):
         status, _ = self._adt("status")
         self.assertEqual(99, status["revision"])
 
+    def test_revision_lower_bound_includes_handoff_no_drift_resume(self) -> None:
+        started = self._start()
+        self._adt(
+            "handoff",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+            "--to",
+            "claude",
+        )
+        self._adt("resume", "--host", "claude")
+        state_path, active = self._stored_state()
+
+        self.assertEqual(3, active["revision"])
+        rolled_back = copy.deepcopy(active)
+        rolled_back["revision"] = 2
+        state_path.write_text(json.dumps(rolled_back))
+        error, _ = self._adt("status", expected_code=4)
+        self.assertEqual("state_corrupt", error["error"]["code"])
+
     def test_state_relations_and_snapshot_rules_have_isolated_mutations(self) -> None:
         first = self._start()
         self._adt(
@@ -1160,9 +1441,13 @@ class AdtCliTest(unittest.TestCase):
             "--lease",
             self._lease(first),
         )
+        (self.repo / "rename-me.txt").write_text("rename this file\n")
+        self._git("add", "rename-me.txt")
+        self._git("commit", "-qm", "add rename candidate")
         second = self._start()
         (self.repo / "app.txt").write_text("staged current task change\n")
         self._git("add", "app.txt")
+        self._git("mv", "rename-me.txt", "renamed.txt")
         self._adt(
             "checkpoint",
             "--host",
@@ -1176,7 +1461,25 @@ class AdtCliTest(unittest.TestCase):
             task = state_value["tasks"][-1]
             return (task["snapshot"], task["checkpoints"][-1]["snapshot"])
 
+        def current_entry(snapshot):
+            return next(
+                entry
+                for entry in snapshot["changes"]["entries"]
+                if entry["path"] == "app.txt"
+            )
+
+        def rename_entry(snapshot):
+            return next(
+                entry
+                for entry in snapshot["changes"]["entries"]
+                if "R" in entry["status"]
+            )
+
         cases = []
+
+        float_revision = copy.deepcopy(baseline)
+        float_revision["revision"] = float(float_revision["revision"])
+        cases.append(("revision-float", float_revision))
 
         wrong_current = copy.deepcopy(baseline)
         wrong_current["current_task_id"] = wrong_current["tasks"][0]["id"]
@@ -1195,11 +1498,66 @@ class AdtCliTest(unittest.TestCase):
         for label, field, invalid in (
             ("fingerprint-mode", "mode", "0o"),
             ("fingerprint-sha256", "sha256", "0" * 63),
+            ("fingerprint-kind", "kind", "unknown"),
+            ("fingerprint-size-negative", "size", -1),
+            ("fingerprint-size-float", "size", 1.0),
         ):
             state_value = copy.deepcopy(baseline)
             for snapshot in current_snapshots(state_value):
-                snapshot["changes"]["entries"][0]["worktree"][field] = invalid
+                current_entry(snapshot)["worktree"][field] = invalid
             cases.append((label, state_value))
+
+        for label, field, invalid in (
+            ("snapshot-algorithm", "algorithm", "sha512"),
+            ("snapshot-digest", "digest", "sha256:" + "0" * 63),
+            ("snapshot-head", "head", "g" * 40),
+        ):
+            state_value = copy.deepcopy(baseline)
+            for snapshot in current_snapshots(state_value):
+                snapshot[field] = invalid
+            cases.append((label, state_value))
+
+        for label, field, invalid in (
+            ("snapshot-total-float", "total", 2.0),
+            ("snapshot-truncated-float", "truncated", 0.0),
+        ):
+            state_value = copy.deepcopy(baseline)
+            for snapshot in current_snapshots(state_value):
+                snapshot["changes"][field] = invalid
+            cases.append((label, state_value))
+
+        negative_truncation = copy.deepcopy(baseline)
+        for snapshot in current_snapshots(negative_truncation):
+            changes = snapshot["changes"]
+            changes["truncated"] = -1
+            changes["total"] = len(changes["entries"]) - 1
+        cases.append(("snapshot-truncated-negative", negative_truncation))
+
+        invalid_path = copy.deepcopy(baseline)
+        for snapshot in current_snapshots(invalid_path):
+            current_entry(snapshot)["path"] = ""
+        cases.append(("change-path", invalid_path))
+
+        incomplete_original = copy.deepcopy(baseline)
+        for snapshot in current_snapshots(incomplete_original):
+            del rename_entry(snapshot)["original_index"]
+        cases.append(("original-field-symmetry", incomplete_original))
+
+        invalid_index_mode = copy.deepcopy(baseline)
+        for snapshot in current_snapshots(invalid_index_mode):
+            index_item = current_entry(snapshot)["index"][0]
+            _, object_id, stage = index_item.split(" ")
+            current_entry(snapshot)["index"][0] = f"999999 {object_id} {stage}"
+        cases.append(("index-mode", invalid_index_mode))
+
+        invalid_object_id = copy.deepcopy(baseline)
+        for snapshot in current_snapshots(invalid_object_id):
+            index_item = current_entry(snapshot)["index"][0]
+            mode, object_id, stage = index_item.split(" ")
+            current_entry(snapshot)["index"][0] = (
+                f"{mode} {'g' * len(object_id)} {stage}"
+            )
+        cases.append(("index-object-id", invalid_object_id))
 
         dirty_mismatch = copy.deepcopy(baseline)
         for snapshot in current_snapshots(dirty_mismatch):
@@ -1213,8 +1571,8 @@ class AdtCliTest(unittest.TestCase):
 
         invalid_stage = copy.deepcopy(baseline)
         for snapshot in current_snapshots(invalid_stage):
-            index_item = snapshot["changes"]["entries"][0]["index"][0]
-            snapshot["changes"]["entries"][0]["index"][0] = index_item[:-1] + "4"
+            index_item = current_entry(snapshot)["index"][0]
+            current_entry(snapshot)["index"][0] = index_item[:-1] + "4"
         cases.append(("index-stage", invalid_stage))
 
         for label, state_value in cases:

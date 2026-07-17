@@ -193,7 +193,8 @@ def _valid_snapshot(snapshot: Any) -> bool:
     entries = changes.get("entries")
     truncated = changes.get("truncated")
     return (
-        _integer(snapshot.get("format_version"))
+        "head" in snapshot
+        and _integer(snapshot.get("format_version"))
         and snapshot["format_version"] == SNAPSHOT_FORMAT_VERSION
         and snapshot.get("algorithm") == "sha256"
         and _fixed_hex(snapshot.get("digest"), prefix="sha256:", length=64)
@@ -211,6 +212,38 @@ def _valid_snapshot(snapshot: Any) -> bool:
         and truncated >= 0
         and total == len(entries) + truncated
         and snapshot["dirty"] == bool(total)
+    )
+
+
+def _fingerprint_contract(value: dict[str, Any] | None) -> tuple[Any, ...] | None:
+    if value is None:
+        return None
+    return tuple(value[field] for field in ("mode", "size", "kind", "sha256"))
+
+
+def _change_entry_contract(entry: dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        entry["status"],
+        entry["path"],
+        tuple(entry["index"]),
+        _fingerprint_contract(entry["worktree"]),
+        entry.get("original_path"),
+        tuple(entry["original_index"]) if "original_index" in entry else None,
+        _fingerprint_contract(entry.get("original_worktree")),
+    )
+
+
+def _snapshot_contract(snapshot: dict[str, Any]) -> tuple[Any, ...]:
+    changes = snapshot["changes"]
+    return (
+        snapshot["format_version"],
+        snapshot["algorithm"],
+        snapshot["digest"],
+        snapshot["head"],
+        snapshot["dirty"],
+        changes["total"],
+        tuple(_change_entry_contract(entry) for entry in changes["entries"]),
+        changes["truncated"],
     )
 
 
@@ -335,7 +368,9 @@ def _valid_task(task: Any) -> bool:
     )
     if not shape_valid:
         return False
-    if checkpoints and task["snapshot"] != checkpoints[-1]["snapshot"]:
+    if checkpoints and _snapshot_contract(task["snapshot"]) != _snapshot_contract(
+        checkpoints[-1]["snapshot"]
+    ):
         return False
     for index, checkpoint in enumerate(checkpoints):
         if checkpoint["kind"] != "drift-accepted":
