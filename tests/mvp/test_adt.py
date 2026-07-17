@@ -427,6 +427,65 @@ class AdtCliTest(unittest.TestCase):
                 error, _ = self._adt("status", expected_code=4)
                 self.assertEqual(expected_code, error["error"]["code"])
 
+    def test_state_load_normalizes_json_parser_limits_to_state_corrupt(self) -> None:
+        self._start()
+        state_path, _ = self._stored_state()
+        malformed_values = (
+            '{"schema_version":' + "9" * 5000 + "}",
+            "[" * 10000 + "0" + "]" * 10000,
+        )
+
+        for encoded in malformed_values:
+            with self.subTest(prefix=encoded[:20]):
+                state_path.write_text(encoded)
+                error, _ = self._adt("status", expected_code=4)
+                self.assertEqual("state_corrupt", error["error"]["code"])
+                self.assertEqual(
+                    "The workspace state cannot be read as valid JSON.",
+                    error["error"]["message"],
+                )
+                self.assertNotIn(str(state_path), error["error"]["message"])
+
+    def test_persisted_numeric_schema_fields_require_true_integers(self) -> None:
+        started = self._start()
+        self._adt(
+            "checkpoint",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+        )
+        state_path, baseline = self._stored_state()
+
+        for invalid_schema in (True, 2.0):
+            with self.subTest(field="schema-version", value=invalid_schema):
+                state_value = copy.deepcopy(baseline)
+                state_value["schema_version"] = invalid_schema
+                state_path.write_text(json.dumps(state_value))
+                error, _ = self._adt("status", expected_code=4)
+                self.assertEqual("state_version_unsupported", error["error"]["code"])
+
+        for label, invalid_value in (
+            ("snapshot-format-version", True),
+            ("snapshot-format-version", 2.0),
+            ("checkpoint-sequence", True),
+            ("checkpoint-sequence", 1.0),
+        ):
+            with self.subTest(field=label, value=invalid_value):
+                state_value = copy.deepcopy(baseline)
+                task = state_value["tasks"][0]
+                if label == "snapshot-format-version":
+                    for snapshot in (
+                        task["snapshot"],
+                        task["checkpoints"][0]["snapshot"],
+                    ):
+                        snapshot["format_version"] = invalid_value
+                else:
+                    task["checkpoints"][0]["sequence"] = invalid_value
+                state_path.write_text(json.dumps(state_value))
+                error, _ = self._adt("status", expected_code=4)
+                self.assertEqual("state_corrupt", error["error"]["code"])
+
     def test_state_load_rejects_malformed_persisted_task_shapes(self) -> None:
         started = self._start()
         (self.repo / "app.txt").write_text("changed before checkpoint\n")
@@ -943,6 +1002,226 @@ class AdtCliTest(unittest.TestCase):
         status, _ = self._adt("status")
         self.assertEqual("handoff", handed_off["checkpoint"]["kind"])
         self.assertEqual("active", status["task"]["status"])
+
+    def test_pause_retains_legacy_raw_host_values(self) -> None:
+        for host in ("", " \n\t", "  codex  "):
+            with self.subTest(host=host):
+                started = self._start(host=host)
+                paused, _ = self._adt(
+                    "pause",
+                    "--host",
+                    host,
+                    "--lease",
+                    self._lease(started),
+                )
+                status, _ = self._adt("status")
+                self.assertEqual(host, paused["checkpoint"]["host"])
+                self.assertEqual(host, status["task"]["resume_host"])
+
+                resumed, _ = self._adt("resume", "--host", host)
+                self._adt(
+                    "complete",
+                    "--host",
+                    host,
+                    "--lease",
+                    self._lease(resumed),
+                )
+
+    def test_drift_accepted_checkpoint_relations_are_validated(self) -> None:
+        started = self._start()
+        paused, _ = self._adt(
+            "pause",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+        )
+        (self.repo / "app.txt").write_text("drifted while paused\n")
+        resumed, _ = self._adt("resume", "--host", "codex", "--accept-drift")
+        state_path, baseline = self._stored_state()
+
+        self.assertEqual(3, resumed["revision"])
+        self.assertEqual("pause", paused["checkpoint"]["kind"])
+        self.assertEqual("drift-accepted", resumed["checkpoint"]["kind"])
+        self.assertEqual(
+            paused["checkpoint"]["snapshot"]["digest"],
+            resumed["checkpoint"]["previous_digest"],
+        )
+        self._adt("status")
+
+        invalid_states = []
+        wrong_digest = copy.deepcopy(baseline)
+        wrong_digest["tasks"][0]["checkpoints"][1]["previous_digest"] = (
+            "sha256:" + "0" * 64
+        )
+        invalid_states.append(("predecessor-digest", wrong_digest))
+
+        wrong_predecessor = copy.deepcopy(baseline)
+        wrong_predecessor["tasks"][0]["checkpoints"][0]["kind"] = "manual"
+        invalid_states.append(("predecessor-kind", wrong_predecessor))
+
+        wrong_host = copy.deepcopy(baseline)
+        wrong_host["tasks"][0]["checkpoints"][1]["host"] = "claude"
+        invalid_states.append(("resume-host", wrong_host))
+
+        unchanged_drift = copy.deepcopy(baseline)
+        task = unchanged_drift["tasks"][0]
+        task["checkpoints"][0]["snapshot"] = copy.deepcopy(
+            task["checkpoints"][1]["snapshot"]
+        )
+        task["checkpoints"][1]["previous_digest"] = task["checkpoints"][0]["snapshot"][
+            "digest"
+        ]
+        invalid_states.append(("unchanged-digest", unchanged_drift))
+
+        for label, state_value in invalid_states:
+            with self.subTest(relation=label):
+                state_path.write_text(json.dumps(state_value))
+                error, _ = self._adt("status", expected_code=4)
+                self.assertEqual("state_corrupt", error["error"]["code"])
+
+    def test_handoff_drift_acceptance_uses_the_target_host(self) -> None:
+        started = self._start()
+        handed_off, _ = self._adt(
+            "handoff",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+            "--to",
+            "claude",
+        )
+        (self.repo / "app.txt").write_text("drifted after handoff\n")
+        resumed, _ = self._adt("resume", "--host", "claude", "--accept-drift")
+        state_path, baseline = self._stored_state()
+
+        self.assertEqual("claude", resumed["checkpoint"]["host"])
+        self.assertEqual(
+            handed_off["checkpoint"]["snapshot"]["digest"],
+            resumed["checkpoint"]["previous_digest"],
+        )
+        self._adt("status")
+
+        baseline["tasks"][0]["checkpoints"][-1]["host"] = "codex"
+        state_path.write_text(json.dumps(baseline))
+        error, _ = self._adt("status", expected_code=4)
+        self.assertEqual("state_corrupt", error["error"]["code"])
+
+    def test_revision_lower_bound_includes_unretained_no_drift_resumes(self) -> None:
+        started = self._start()
+        self._adt(
+            "pause",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+        )
+        resumed, _ = self._adt("resume", "--host", "codex")
+        state_path, active = self._stored_state()
+
+        self.assertEqual(3, active["revision"])
+        self._adt("status")
+        rolled_back = copy.deepcopy(active)
+        rolled_back["revision"] = 2
+        state_path.write_text(json.dumps(rolled_back))
+        error, _ = self._adt("status", expected_code=4)
+        self.assertEqual("state_corrupt", error["error"]["code"])
+
+        state_path.write_text(json.dumps(active))
+        completed, _ = self._adt(
+            "complete",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(resumed),
+        )
+        state_path, terminal = self._stored_state()
+        self.assertEqual(4, completed["revision"])
+        self._adt("status")
+
+        rolled_back = copy.deepcopy(terminal)
+        rolled_back["revision"] = 3
+        state_path.write_text(json.dumps(rolled_back))
+        error, _ = self._adt("status", expected_code=4)
+        self.assertEqual("state_corrupt", error["error"]["code"])
+
+        future_revision = copy.deepcopy(terminal)
+        future_revision["revision"] = 99
+        state_path.write_text(json.dumps(future_revision))
+        status, _ = self._adt("status")
+        self.assertEqual(99, status["revision"])
+
+    def test_state_relations_and_snapshot_rules_have_isolated_mutations(self) -> None:
+        first = self._start()
+        self._adt(
+            "complete",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(first),
+        )
+        second = self._start()
+        (self.repo / "app.txt").write_text("staged current task change\n")
+        self._git("add", "app.txt")
+        self._adt(
+            "checkpoint",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(second),
+        )
+        state_path, baseline = self._stored_state()
+
+        def current_snapshots(state_value):
+            task = state_value["tasks"][-1]
+            return (task["snapshot"], task["checkpoints"][-1]["snapshot"])
+
+        cases = []
+
+        wrong_current = copy.deepcopy(baseline)
+        wrong_current["current_task_id"] = wrong_current["tasks"][0]["id"]
+        cases.append(("current-is-last", wrong_current))
+
+        open_history = copy.deepcopy(baseline)
+        prior_id = open_history["tasks"][0]["id"]
+        open_history["tasks"][0] = copy.deepcopy(open_history["tasks"][-1])
+        open_history["tasks"][0]["id"] = prior_id
+        cases.append(("previous-task-completed", open_history))
+
+        duplicate_ids = copy.deepcopy(baseline)
+        duplicate_ids["tasks"][0]["id"] = duplicate_ids["tasks"][-1]["id"]
+        cases.append(("unique-task-ids", duplicate_ids))
+
+        for label, field, invalid in (
+            ("fingerprint-mode", "mode", "0o"),
+            ("fingerprint-sha256", "sha256", "0" * 63),
+        ):
+            state_value = copy.deepcopy(baseline)
+            for snapshot in current_snapshots(state_value):
+                snapshot["changes"]["entries"][0]["worktree"][field] = invalid
+            cases.append((label, state_value))
+
+        dirty_mismatch = copy.deepcopy(baseline)
+        for snapshot in current_snapshots(dirty_mismatch):
+            snapshot["dirty"] = False
+        cases.append(("dirty-total-coherence", dirty_mismatch))
+
+        total_mismatch = copy.deepcopy(baseline)
+        for snapshot in current_snapshots(total_mismatch):
+            snapshot["changes"]["total"] += 1
+        cases.append(("total-entry-truncation-coherence", total_mismatch))
+
+        invalid_stage = copy.deepcopy(baseline)
+        for snapshot in current_snapshots(invalid_stage):
+            index_item = snapshot["changes"]["entries"][0]["index"][0]
+            snapshot["changes"]["entries"][0]["index"][0] = index_item[:-1] + "4"
+        cases.append(("index-stage", invalid_stage))
+
+        for label, state_value in cases:
+            with self.subTest(rule=label):
+                state_path.write_text(json.dumps(state_value))
+                error, _ = self._adt("status", expected_code=4)
+                self.assertEqual("state_corrupt", error["error"]["code"])
 
     def test_state_load_accepts_only_legal_porcelain_v1_status_pairs(self) -> None:
         (self.repo / "app.txt").write_text("dirty before task start\n")
