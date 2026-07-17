@@ -146,7 +146,7 @@ def _valid_porcelain_v1_status(status: Any) -> bool:
     if index_status == " ":
         return worktree_status in WORKTREE_STATUSES | {"A"}
     if index_status == "D":
-        return worktree_status == " "
+        return worktree_status in {" ", "A", "R", "C"}
     return (
         index_status in INDEX_STATUSES
         and worktree_status in INDEXED_WORKTREE_STATUSES

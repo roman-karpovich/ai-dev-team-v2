@@ -85,6 +85,38 @@ class AdtCliTest(unittest.TestCase):
         self.assertEqual(1, len(matches))
         return matches[0], json.loads(matches[0].read_text())
 
+    def _assert_persisted_status_round_trips(
+        self,
+        expected_status: str,
+        expected_path: str,
+        *,
+        expected_original_path: str | None = None,
+    ) -> None:
+        started = self._start()
+        _, state_value = self._stored_state()
+        persisted_snapshot = state_value["tasks"][0]["snapshot"]
+        self.assertEqual(started["task"]["snapshot"], persisted_snapshot)
+        runtime = self._load_runtime()
+        self.assertTrue(runtime._valid_snapshot(persisted_snapshot))
+        emitted_entry = next(
+            entry
+            for entry in persisted_snapshot["changes"]["entries"]
+            if entry["status"] == expected_status
+        )
+        self.assertEqual(expected_path, emitted_entry["path"])
+        if expected_original_path is None:
+            self.assertNotIn("original_path", emitted_entry)
+        else:
+            self.assertEqual(
+                expected_original_path,
+                emitted_entry["original_path"],
+            )
+
+        for command in ("status", "context", "list"):
+            with self.subTest(status=expected_status, command=command):
+                payload, _ = self._adt(command)
+                self.assertTrue(payload["ok"])
+
     def _load_runtime(self):
         spec = importlib.util.spec_from_file_location("adt_under_test", ADT)
         self.assertIsNotNone(spec)
@@ -475,6 +507,7 @@ class AdtCliTest(unittest.TestCase):
         for label, invalid_value in (
             ("snapshot-format-version", True),
             ("snapshot-format-version", 2.0),
+            ("snapshot-format-version", 99),
             ("checkpoint-sequence", True),
             ("checkpoint-sequence", 1.0),
             ("snapshot-total", 1.0),
@@ -508,6 +541,19 @@ class AdtCliTest(unittest.TestCase):
                 state_path.write_text(json.dumps(state_value))
                 error, _ = self._adt("status", expected_code=4)
                 self.assertEqual("state_corrupt", error["error"]["code"])
+
+    def test_revision_boolean_is_rejected_at_the_minimum_revision_floor(
+        self,
+    ) -> None:
+        self._start()
+        state_path, state_value = self._stored_state()
+        self.assertEqual(1, state_value["revision"])
+        state_value["revision"] = True
+        state_path.write_text(json.dumps(state_value))
+
+        error, _ = self._adt("status", expected_code=4)
+
+        self.assertEqual("state_corrupt", error["error"]["code"])
 
     def test_snapshot_coherence_ignores_unknown_nested_object_keys(self) -> None:
         started = self._start()
@@ -549,6 +595,49 @@ class AdtCliTest(unittest.TestCase):
         state_path.write_text(json.dumps(state_value))
         error, _ = self._adt("status", expected_code=4)
         self.assertEqual("state_corrupt", error["error"]["code"])
+
+    def test_snapshot_coherence_ignores_original_fingerprint_extensions(
+        self,
+    ) -> None:
+        (self.repo / "rename-me.txt").write_text("rename this file\n")
+        self._git("add", "rename-me.txt")
+        self._git("commit", "-qm", "add rename candidate")
+        started = self._start()
+        self._git("mv", "rename-me.txt", "renamed.txt")
+        self._adt(
+            "checkpoint",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+        )
+        state_path, state_value = self._stored_state()
+        task = state_value["tasks"][0]
+        task_entry = next(
+            entry
+            for entry in task["snapshot"]["changes"]["entries"]
+            if "R" in entry["status"]
+        )
+        checkpoint_entry = next(
+            entry
+            for entry in task["checkpoints"][-1]["snapshot"]["changes"][
+                "entries"
+            ]
+            if "R" in entry["status"]
+        )
+        task_entry["original_worktree"] = copy.deepcopy(task_entry["worktree"])
+        checkpoint_entry["original_worktree"] = copy.deepcopy(
+            checkpoint_entry["worktree"]
+        )
+        task_entry["original_worktree"]["future_extension"] = {"source": "task"}
+        checkpoint_entry["original_worktree"]["future_extension"] = {
+            "source": "checkpoint"
+        }
+        state_path.write_text(json.dumps(state_value))
+
+        status, _ = self._adt("status")
+
+        self.assertEqual(task["id"], status["task"]["id"])
 
     def test_snapshot_coherence_still_compares_all_declared_nested_fields(
         self,
@@ -685,6 +774,17 @@ class AdtCliTest(unittest.TestCase):
         )
         original_entry["original_index"].append(original_entry["index"][0])
         cases.append(("original-index", changed_original_index))
+
+        changed_original_index_order = copy.deepcopy(baseline)
+        task = changed_original_index_order["tasks"][0]
+        task_entry = renamed_entry(task["snapshot"])
+        checkpoint_entry = renamed_entry(task["checkpoints"][-1]["snapshot"])
+        mode, object_id, _ = task_entry["index"][0].split(" ")
+        first_item = f"{mode} {object_id} 1"
+        second_item = f"{mode} {object_id} 2"
+        task_entry["original_index"] = [first_item, second_item]
+        checkpoint_entry["original_index"] = [second_item, first_item]
+        cases.append(("original-index-order", changed_original_index_order))
 
         changed_original_worktree = copy.deepcopy(baseline)
         original_entry = renamed_entry(
@@ -1135,6 +1235,62 @@ class AdtCliTest(unittest.TestCase):
                     else:
                         del copied_entry[field]
                 state_path.write_text(json.dumps(malformed))
+                error, _ = self._adt("status", expected_code=4)
+                self.assertEqual("state_corrupt", error["error"]["code"])
+
+    def test_original_fields_are_symmetric_for_rename_and_plain_entries(
+        self,
+    ) -> None:
+        (self.repo / "rename-me.txt").write_text("rename this file\n")
+        self._git("add", "rename-me.txt")
+        self._git("commit", "-qm", "add rename candidate")
+        started = self._start()
+        (self.repo / "app.txt").write_text("changed before checkpoint\n")
+        self._git("mv", "rename-me.txt", "renamed.txt")
+        self._adt(
+            "checkpoint",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+        )
+        state_path, baseline = self._stored_state()
+
+        def snapshots(state_value):
+            task = state_value["tasks"][0]
+            return (task["snapshot"], task["checkpoints"][-1]["snapshot"])
+
+        def rename_entry(snapshot):
+            return next(
+                entry
+                for entry in snapshot["changes"]["entries"]
+                if "R" in entry["status"]
+            )
+
+        def plain_entry(snapshot):
+            return next(
+                entry
+                for entry in snapshot["changes"]["entries"]
+                if entry["path"] == "app.txt"
+            )
+
+        missing_original_worktree = copy.deepcopy(baseline)
+        for snapshot in snapshots(missing_original_worktree):
+            del rename_entry(snapshot)["original_worktree"]
+
+        stray_plain_originals = copy.deepcopy(baseline)
+        for snapshot in snapshots(stray_plain_originals):
+            plain = plain_entry(snapshot)
+            plain["original_path"] = "old-app.txt"
+            plain["original_index"] = copy.deepcopy(plain["index"])
+            plain["original_worktree"] = copy.deepcopy(plain["worktree"])
+
+        for label, state_value in (
+            ("rename-missing-original-worktree", missing_original_worktree),
+            ("plain-entry-with-original-fields", stray_plain_originals),
+        ):
+            with self.subTest(case=label):
+                state_path.write_text(json.dumps(state_value))
                 error, _ = self._adt("status", expected_code=4)
                 self.assertEqual("state_corrupt", error["error"]["code"])
 
@@ -1594,6 +1750,9 @@ class AdtCliTest(unittest.TestCase):
             "A ",
             " D",
             "D ",
+            "DR",
+            "DC",
+            "DA",
             " R",
             "R ",
             " C",
@@ -1621,7 +1780,18 @@ class AdtCliTest(unittest.TestCase):
                 listed, _ = self._adt("list")
                 self.assertEqual(1, len(listed["tasks"]))
 
-        for status in ("  ", "MA", "MR", "MC", "U ", "DM", "!?"):
+        for status in (
+            "  ",
+            "MA",
+            "MR",
+            "MC",
+            "U ",
+            "DM",
+            "DT",
+            "D?",
+            "D!",
+            "!?",
+        ):
             with self.subTest(invalid=status):
                 state_value = copy.deepcopy(baseline)
                 state_value["tasks"][0]["snapshot"]["changes"]["entries"][0][
@@ -1630,6 +1800,65 @@ class AdtCliTest(unittest.TestCase):
                 state_path.write_text(json.dumps(state_value))
                 error, _ = self._adt("list", expected_code=4)
                 self.assertEqual("state_corrupt", error["error"]["code"])
+
+    def test_real_worktree_rename_from_deleted_index_row_round_trips(
+        self,
+    ) -> None:
+        (self.repo / "a.txt").write_text("same content\n")
+        (self.repo / "b.txt").write_text("old destination\n")
+        self._git("add", "a.txt", "b.txt")
+        self._git("commit", "-qm", "add rename pair")
+        self._git("rm", "--cached", "b.txt")
+        (self.repo / "b.txt").write_text((self.repo / "a.txt").read_text())
+        self._git("add", "-N", "b.txt")
+        (self.repo / "a.txt").unlink()
+        porcelain = self._git("status", "--porcelain=v1", "-z")
+        self.assertEqual("DR b.txt\0a.txt\0", porcelain.stdout)
+
+        self._assert_persisted_status_round_trips(
+            "DR",
+            "b.txt",
+            expected_original_path="a.txt",
+        )
+
+    def test_real_intent_to_add_from_deleted_index_row_round_trips(self) -> None:
+        destination = self.repo / "b.txt"
+        destination.write_text("tracked destination\n")
+        self._git("add", "b.txt")
+        self._git("commit", "-qm", "add destination")
+        self._git("rm", "--cached", "b.txt")
+        destination.unlink()
+        destination.write_text("tracked destination\n")
+        self._git("add", "-N", "b.txt")
+        porcelain = self._git("status", "--porcelain=v1", "-z")
+        self.assertEqual("DA b.txt\0", porcelain.stdout)
+
+        self._assert_persisted_status_round_trips("DA", "b.txt")
+
+    def test_real_worktree_copy_from_deleted_index_row_round_trips(self) -> None:
+        self._git("config", "status.renames", "copies")
+        source = self.repo / "source.txt"
+        destination = self.repo / "destination.txt"
+        source.write_text("committed source\n")
+        destination.write_text("old destination\n")
+        self._git("add", "source.txt", "destination.txt")
+        self._git("commit", "-qm", "add copy candidates")
+        committed_source = source.read_text()
+        self._git("rm", "--cached", "destination.txt")
+        destination.write_text(committed_source)
+        self._git("add", "-N", "destination.txt")
+        source.write_text("modified source\n")
+        porcelain = self._git("status", "--porcelain=v1", "-z")
+        self.assertEqual(
+            "DC destination.txt\0source.txt\0 M source.txt\0",
+            porcelain.stdout,
+        )
+
+        self._assert_persisted_status_round_trips(
+            "DC",
+            "destination.txt",
+            expected_original_path="source.txt",
+        )
 
     def test_state_load_validates_non_current_history(self) -> None:
         first = self._start()
