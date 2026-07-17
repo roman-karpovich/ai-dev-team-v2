@@ -278,6 +278,176 @@ class AdtCliTest(unittest.TestCase):
                         raise original
             self.assertIs(original, raised.exception)
 
+    def test_lock_cleanup_failure_after_success_reports_state_unavailable(self) -> None:
+        runtime = self._load_runtime()
+        workspace = runtime.GitWorkspace(
+            root=self.repo,
+            common_dir=self.repo / ".git",
+            workspace_id="successful-body-cleanup-failure",
+        )
+        store = runtime.StateStore(workspace)
+
+        with self.subTest(operation="unlock"):
+            with mock.patch.object(
+                runtime.fcntl,
+                "flock",
+                side_effect=[None, OSError("unlock failed")],
+            ):
+                with self.assertRaises(runtime.CliError) as raised:
+                    with store.lock():
+                        pass
+            self.assertEqual("state_unavailable", raised.exception.code)
+            self.assertEqual(4, raised.exception.exit_code)
+            self.assertEqual(
+                runtime.STATE_UNAVAILABLE_MESSAGE,
+                raised.exception.message,
+            )
+
+        lock_file = mock.Mock()
+        lock_file.fileno.return_value = 42
+        lock_file.close.side_effect = OSError("close failed")
+        with self.subTest(operation="close"):
+            with (
+                mock.patch.object(runtime.Path, "open", return_value=lock_file),
+                mock.patch.object(runtime.os, "chmod"),
+                mock.patch.object(runtime.fcntl, "flock"),
+            ):
+                with self.assertRaises(runtime.CliError) as raised:
+                    with store.lock():
+                        pass
+            self.assertEqual("state_unavailable", raised.exception.code)
+            self.assertEqual(4, raised.exception.exit_code)
+            self.assertEqual(
+                runtime.STATE_UNAVAILABLE_MESSAGE,
+                raised.exception.message,
+            )
+
+    def test_state_exists_metadata_failure_reports_state_unavailable(self) -> None:
+        runtime = self._load_runtime()
+        workspace = runtime.GitWorkspace(
+            root=self.repo,
+            common_dir=self.repo / ".git",
+            workspace_id="metadata-unavailable",
+        )
+        store = runtime.StateStore(workspace)
+
+        with mock.patch.object(
+            runtime.Path,
+            "stat",
+            side_effect=PermissionError("private machine path"),
+        ):
+            with self.assertRaises(runtime.CliError) as raised:
+                store.exists()
+
+        self.assertEqual("state_unavailable", raised.exception.code)
+        self.assertEqual(4, raised.exception.exit_code)
+        self.assertEqual(runtime.STATE_UNAVAILABLE_MESSAGE, raised.exception.message)
+        self.assertNotIn("private machine path", raised.exception.message)
+
+    def test_absent_state_has_no_task_status_and_empty_list(self) -> None:
+        for command in ("status", "context"):
+            with self.subTest(command=command):
+                error, _ = self._adt(command, expected_code=3)
+                self.assertEqual("no_task", error["error"]["code"])
+
+        listed, _ = self._adt("list")
+        self.assertEqual(0, listed["revision"])
+        self.assertIsNone(listed["current_task_id"])
+        self.assertEqual([], listed["tasks"])
+
+    def test_state_load_rejects_malformed_unsupported_and_invalid_shapes(self) -> None:
+        self._start()
+        state_path, baseline = self._stored_state()
+        cases = (
+            ("malformed-json", "{", "state_corrupt"),
+            ("non-object", json.dumps([]), "state_version_unsupported"),
+            (
+                "unsupported-version",
+                json.dumps({**baseline, "schema_version": 999}),
+                "state_version_unsupported",
+            ),
+            (
+                "invalid-workspace-shape",
+                json.dumps({**baseline, "workspace": []}),
+                "state_corrupt",
+            ),
+            (
+                "invalid-tasks-shape",
+                json.dumps({**baseline, "tasks": {}}),
+                "state_corrupt",
+            ),
+        )
+
+        for label, encoded, expected_code in cases:
+            with self.subTest(case=label):
+                state_path.write_text(encoded)
+                error, _ = self._adt("status", expected_code=4)
+                self.assertEqual(expected_code, error["error"]["code"])
+
+    def test_state_load_rejects_malformed_current_task_shapes(self) -> None:
+        self._start()
+        state_path, baseline = self._stored_state()
+        task_id = baseline["current_task_id"]
+        task = baseline["tasks"][0]
+        private_marker = "/private/machine/state.json"
+        cases = (
+            ("revision", {**baseline, "revision": private_marker}),
+            ("current-task-id", {**baseline, "current_task_id": []}),
+            ("missing-current-task", {**baseline, "tasks": []}),
+            (
+                "current-task",
+                {**baseline, "tasks": [{"id": task_id, "snapshot": []}]},
+            ),
+            (
+                "snapshot",
+                {
+                    **baseline,
+                    "tasks": [{**task, "snapshot": {"digest": [private_marker]}}],
+                },
+            ),
+            (
+                "checkpoints",
+                {**baseline, "tasks": [{**task, "checkpoints": private_marker}]},
+            ),
+        )
+
+        for label, state_value in cases:
+            with self.subTest(case=label):
+                state_path.write_text(json.dumps(state_value))
+                error, _ = self._adt("status", expected_code=4)
+                self.assertEqual("state_corrupt", error["error"]["code"])
+                self.assertNotIn(private_marker, error["error"]["message"])
+
+    def test_takeover_rejects_malformed_takeover_history(self) -> None:
+        self._start()
+        state_path, baseline = self._stored_state()
+        task = baseline["tasks"][0]
+        state_path.write_text(
+            json.dumps({**baseline, "tasks": [{**task, "takeovers": "corrupt"}]})
+        )
+
+        error, _ = self._adt(
+            "takeover",
+            "--host",
+            "codex",
+            "--reason",
+            "Recover the task",
+            expected_code=4,
+        )
+
+        self.assertEqual("state_corrupt", error["error"]["code"])
+
+    def test_null_current_task_does_not_match_malformed_task(self) -> None:
+        self._start()
+        state_path, baseline = self._stored_state()
+        state_path.write_text(
+            json.dumps({**baseline, "current_task_id": None, "tasks": [{}]})
+        )
+
+        error, _ = self._adt("status", expected_code=3)
+
+        self.assertEqual("no_task", error["error"]["code"])
+
     def test_state_save_failure_reports_state_unavailable_without_path(self) -> None:
         runtime = self._load_runtime()
         workspace = runtime.GitWorkspace(
@@ -326,6 +496,308 @@ class AdtCliTest(unittest.TestCase):
         self.assertEqual("state_unavailable", raised.exception.code)
         self.assertEqual(original, store.state_path.read_bytes())
         self.assertEqual([], list(store.directory.glob("state.*.tmp")))
+
+    def test_state_save_fsyncs_closed_temp_before_replace_and_directory_after(self) -> None:
+        runtime = self._load_runtime()
+        workspace = runtime.GitWorkspace(
+            root=self.repo,
+            common_dir=self.repo / ".git",
+            workspace_id="durable-save-order",
+        )
+        store = runtime.StateStore(workspace)
+        temporary_name = str(store.directory / "state.owned.tmp")
+        events: list[tuple[object, ...]] = []
+
+        class TemporaryFile:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args: object) -> None:
+                events.append(("close-temp",))
+
+            def write(self, _payload: bytes) -> None:
+                events.append(("write",))
+
+            def flush(self) -> None:
+                events.append(("flush",))
+
+            def fileno(self) -> int:
+                return 31
+
+        def record(event: str, *values: object, result: object = None):
+            events.append((event, *values))
+            return result
+
+        with (
+            mock.patch.object(
+                runtime.tempfile,
+                "mkstemp",
+                side_effect=lambda **_kwargs: record(
+                    "mkstemp", result=(31, temporary_name)
+                ),
+            ),
+            mock.patch.object(
+                runtime.os,
+                "fchmod",
+                side_effect=lambda descriptor, mode: record(
+                    "fchmod", descriptor, mode
+                ),
+            ),
+            mock.patch.object(
+                runtime.os,
+                "fdopen",
+                side_effect=lambda descriptor, mode: record(
+                    "fdopen", descriptor, mode, result=TemporaryFile()
+                ),
+            ),
+            mock.patch.object(
+                runtime.os,
+                "fsync",
+                side_effect=lambda descriptor: record("fsync", descriptor),
+            ),
+            mock.patch.object(
+                runtime.os,
+                "replace",
+                side_effect=lambda source, destination: record(
+                    "replace", source, destination
+                ),
+            ),
+            mock.patch.object(
+                runtime.os,
+                "open",
+                side_effect=lambda path, flags: record(
+                    "open-dir", path, flags, result=41
+                ),
+            ),
+            mock.patch.object(
+                runtime.os,
+                "close",
+                side_effect=lambda descriptor: record("close-dir", descriptor),
+            ),
+            mock.patch.object(runtime.os, "unlink"),
+        ):
+            store.save({"schema_version": runtime.SCHEMA_VERSION})
+
+        self.assertEqual(
+            [
+                ("mkstemp",),
+                ("fchmod", 31, 0o600),
+                ("fdopen", 31, "wb"),
+                ("write",),
+                ("flush",),
+                ("fsync", 31),
+                ("close-temp",),
+                ("replace", temporary_name, store.state_path),
+                ("open-dir", store.directory, runtime.os.O_RDONLY),
+                ("fsync", 41),
+                ("close-dir", 41),
+            ],
+            events,
+        )
+
+    def test_state_save_cleans_temp_when_temp_fsync_fails(self) -> None:
+        runtime = self._load_runtime()
+        workspace = runtime.GitWorkspace(
+            root=self.repo,
+            common_dir=self.repo / ".git",
+            workspace_id="temp-fsync-failure",
+        )
+        store = runtime.StateStore(workspace)
+        store.directory.mkdir(parents=True)
+        original = b"existing state\n"
+        store.state_path.write_bytes(original)
+
+        with (
+            mock.patch.object(
+                runtime.os,
+                "fsync",
+                side_effect=OSError("temp fsync failed"),
+            ),
+            mock.patch.object(runtime.os, "replace") as replace,
+        ):
+            with self.assertRaises(runtime.CliError) as raised:
+                store.save({"schema_version": runtime.SCHEMA_VERSION})
+
+        self.assertEqual("state_unavailable", raised.exception.code)
+        self.assertEqual(4, raised.exception.exit_code)
+        replace.assert_not_called()
+        self.assertEqual(original, store.state_path.read_bytes())
+        self.assertEqual([], list(store.directory.glob("state.*.tmp")))
+
+    def test_state_save_fchmod_failure_cleans_owned_temp(self) -> None:
+        runtime = self._load_runtime()
+        workspace = runtime.GitWorkspace(
+            root=self.repo,
+            common_dir=self.repo / ".git",
+            workspace_id="fchmod-failure",
+        )
+        store = runtime.StateStore(workspace)
+        store.directory.mkdir(parents=True)
+        original = b"existing state\n"
+        store.state_path.write_bytes(original)
+
+        with (
+            mock.patch.object(
+                runtime.os,
+                "fchmod",
+                side_effect=OSError("fchmod failed"),
+            ),
+            mock.patch.object(runtime.os, "replace") as replace,
+        ):
+            with self.assertRaises(runtime.CliError) as raised:
+                store.save({"schema_version": runtime.SCHEMA_VERSION})
+
+        self.assertEqual("state_unavailable", raised.exception.code)
+        self.assertEqual(4, raised.exception.exit_code)
+        replace.assert_not_called()
+        self.assertEqual(original, store.state_path.read_bytes())
+        self.assertEqual([], list(store.directory.glob("state.*.tmp")))
+
+    def test_state_save_write_flush_and_temp_close_failures_clean_temp(self) -> None:
+        runtime = self._load_runtime()
+        workspace = runtime.GitWorkspace(
+            root=self.repo,
+            common_dir=self.repo / ".git",
+            workspace_id="temp-file-failure",
+        )
+        store = runtime.StateStore(workspace)
+        temporary_name = str(store.directory / "state.owned.tmp")
+
+        class TemporaryFile:
+            def __init__(self, failed_operation: str) -> None:
+                self.failed_operation = failed_operation
+                self.close_attempted = False
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args: object) -> None:
+                self.close_attempted = True
+                if self.failed_operation == "close":
+                    raise OSError("temp close failed")
+
+            def write(self, _payload: bytes) -> None:
+                if self.failed_operation == "write":
+                    raise OSError("write failed")
+
+            def flush(self) -> None:
+                if self.failed_operation == "flush":
+                    raise OSError("flush failed")
+
+            def fileno(self) -> int:
+                return 31
+
+        for operation in ("write", "flush", "close"):
+            with self.subTest(operation=operation):
+                temporary_file = TemporaryFile(operation)
+                with (
+                    mock.patch.object(
+                        runtime.tempfile,
+                        "mkstemp",
+                        return_value=(31, temporary_name),
+                    ),
+                    mock.patch.object(runtime.os, "fchmod"),
+                    mock.patch.object(
+                        runtime.os,
+                        "fdopen",
+                        return_value=temporary_file,
+                    ),
+                    mock.patch.object(runtime.os, "fsync"),
+                    mock.patch.object(runtime.os, "replace") as replace,
+                    mock.patch.object(runtime.os, "unlink") as unlink,
+                ):
+                    with self.assertRaises(runtime.CliError) as raised:
+                        store.save({"schema_version": runtime.SCHEMA_VERSION})
+
+                self.assertEqual("state_unavailable", raised.exception.code)
+                self.assertEqual(4, raised.exception.exit_code)
+                self.assertTrue(temporary_file.close_attempted)
+                replace.assert_not_called()
+                unlink.assert_called_once_with(temporary_name)
+
+    def test_state_save_reports_directory_fsync_failure_after_replace_lands(self) -> None:
+        runtime = self._load_runtime()
+        workspace = runtime.GitWorkspace(
+            root=self.repo,
+            common_dir=self.repo / ".git",
+            workspace_id="directory-fsync-failure",
+        )
+        store = runtime.StateStore(workspace)
+        store.directory.mkdir(parents=True)
+        original_fsync = runtime.os.fsync
+        fsync_calls = 0
+
+        def fail_directory_fsync(descriptor: int) -> None:
+            nonlocal fsync_calls
+            fsync_calls += 1
+            if fsync_calls == 2:
+                raise OSError("directory fsync failed")
+            original_fsync(descriptor)
+
+        replacement = {"schema_version": runtime.SCHEMA_VERSION, "landed": True}
+        with mock.patch.object(
+            runtime.os,
+            "fsync",
+            side_effect=fail_directory_fsync,
+        ):
+            with self.assertRaises(runtime.CliError) as raised:
+                store.save(replacement)
+
+        self.assertEqual("state_unavailable", raised.exception.code)
+        self.assertEqual(4, raised.exception.exit_code)
+        self.assertEqual(replacement, json.loads(store.state_path.read_text()))
+        self.assertEqual([], list(store.directory.glob("state.*.tmp")))
+
+    def test_state_save_directory_open_and_close_failures_report_landed_state(self) -> None:
+        runtime = self._load_runtime()
+        workspace = runtime.GitWorkspace(
+            root=self.repo,
+            common_dir=self.repo / ".git",
+            workspace_id="directory-handle-failure",
+        )
+        store = runtime.StateStore(workspace)
+        store.directory.mkdir(parents=True)
+        original_open = runtime.os.open
+        original_close = runtime.os.close
+
+        for operation in ("open", "close"):
+            with self.subTest(operation=operation):
+                directory_descriptor = None
+
+                def controlled_open(path, flags, *args, **kwargs):
+                    nonlocal directory_descriptor
+                    if Path(path) == store.directory and operation == "open":
+                        raise OSError("directory open failed")
+                    descriptor = original_open(path, flags, *args, **kwargs)
+                    if Path(path) == store.directory:
+                        directory_descriptor = descriptor
+                    return descriptor
+
+                def controlled_close(descriptor):
+                    if descriptor == directory_descriptor and operation == "close":
+                        original_close(descriptor)
+                        raise OSError("directory close failed")
+                    return original_close(descriptor)
+
+                replacement = {
+                    "schema_version": runtime.SCHEMA_VERSION,
+                    "operation": operation,
+                }
+                with (
+                    mock.patch.object(runtime.os, "open", side_effect=controlled_open),
+                    mock.patch.object(
+                        runtime.os,
+                        "close",
+                        side_effect=controlled_close,
+                    ),
+                ):
+                    with self.assertRaises(runtime.CliError) as raised:
+                        store.save(replacement)
+
+                self.assertEqual("state_unavailable", raised.exception.code)
+                self.assertEqual(4, raised.exception.exit_code)
+                self.assertEqual(replacement, json.loads(store.state_path.read_text()))
+                self.assertEqual([], list(store.directory.glob("state.*.tmp")))
 
     def test_state_read_failure_is_unavailable_not_corrupt(self) -> None:
         runtime = self._load_runtime()
