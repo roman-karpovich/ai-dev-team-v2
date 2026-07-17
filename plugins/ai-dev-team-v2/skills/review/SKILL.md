@@ -19,22 +19,12 @@ All `references/...` locators below resolve from the installed plugin root.
 | `request:cold\|independent\|two-model` | `references/cold-independent-review.md` | `before:artifact-inspection\|repository-context\|adt-state` |
 | `host:claude` | `references/claude-runtime.md` | `after:cold-if-triggered;before:repository-exposure\|adt-state\|artifact-inspection` |
 | `always` | `references/task-lifecycle.md` | `after:prior-preflights;before:adt-state\|mutation` |
+| `depends-on:auto-reporting\|framework-lifecycle\|process-lifecycle\|termination\|propagation\|bootstrap\|event-cardinality` | `references/incident-observability.md` | `before:claim-artifact-inspection` |
+| `acceptance:input-domain\|upstream-replacement:removed,deprecated,unavailable->local-derivation` | `references/semantic-boundaries.md` | `before:claim-judgment` |
+| `verification:unavailable-dependency\|runtime\|production-bootstrap\|environment-equivalence` | `references/verification-environments.md` | `before:verification-selection` |
 
 `|` joins alternatives or boundary members; `;` sequences boundaries from
 left to right.
-
-Load optional specialist routes only when their trigger applies:
-
-- When a reviewed claim actually depends on automatic reporting, framework or
-  process lifecycle, termination or propagation, bootstrap, or event
-  cardinality, read `references/incident-observability.md` before inspecting
-  the artifact for that claim.
-- When acceptance turns on an input-domain boundary or on replacing a removed,
-  deprecated, or unavailable upstream value with a local derivation, read
-  `references/semantic-boundaries.md` before judging that claim.
-- When a required check needs an unavailable dependency, runtime, production
-  bootstrap, or load-bearing environment equivalence, read
-  `references/verification-environments.md` before selecting verification.
 
 ## Define the review without priming it
 

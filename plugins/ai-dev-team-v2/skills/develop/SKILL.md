@@ -11,22 +11,18 @@ repository instructions. Do not launch another provider automatically.
 
 All `references/...` locators below resolve from the installed plugin root.
 
-## Load only what applies
+## Route references
 
-- When `HOST=claude`, read `references/claude-runtime.md` before repository
-  exposure, ADT state, or editing.
-- Always read `references/task-lifecycle.md` before ADT state or mutation,
-  after the Claude runtime preflight when it applies.
-- When the requested outcome actually depends on automatic reporting,
-  framework or process lifecycle, termination or propagation, bootstrap, or
-  event cardinality, read `references/incident-observability.md` before forming
-  the task contract or making a candidate edit.
-- When acceptance turns on an input-domain boundary or on replacing a removed,
-  deprecated, or unavailable upstream value with a local derivation, read
-  `references/semantic-boundaries.md` before forming the task contract.
-- When a required check needs an unavailable dependency, runtime, production
-  bootstrap, or load-bearing environment equivalence, read
-  `references/verification-environments.md` before selecting verification.
+| Trigger | Resource | Boundary |
+| --- | --- | --- |
+| `host:claude` | `references/claude-runtime.md` | `before:repository-exposure\|adt-state\|editing` |
+| `always` | `references/task-lifecycle.md` | `after:claude-if-triggered;before:adt-state\|mutation` |
+| `depends-on:auto-reporting\|framework-lifecycle\|process-lifecycle\|termination\|propagation\|bootstrap\|event-cardinality` | `references/incident-observability.md` | `before:task-contract\|candidate-edit` |
+| `acceptance:input-domain\|upstream-replacement:removed,deprecated,unavailable->local-derivation` | `references/semantic-boundaries.md` | `before:task-contract` |
+| `verification:unavailable-dependency\|runtime\|production-bootstrap\|environment-equivalence` | `references/verification-environments.md` | `before:verification-selection` |
+
+`|` joins alternatives or boundary members; `;` sequences boundaries from
+left to right.
 
 ## Establish the task
 
