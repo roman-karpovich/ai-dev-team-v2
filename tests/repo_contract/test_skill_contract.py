@@ -6,6 +6,7 @@ import re
 import shlex
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from urllib.parse import unquote, urlparse
 
 
@@ -318,6 +319,17 @@ def python_has_model_selector(text: str) -> bool:
         elif isinstance(node, ast.Call):
             if (
                 isinstance(node.func, ast.Attribute)
+                and node.func.attr == "add_argument"
+                and any(
+                    keyword.arg == "dest"
+                    and isinstance(keyword.value, ast.Constant)
+                    and model_key(keyword.value.value)
+                    for keyword in node.keywords
+                )
+            ):
+                return True
+            if (
+                isinstance(node.func, ast.Attribute)
                 and node.func.attr == "setdefault"
                 and len(node.args) >= 2
                 and isinstance(node.args[0], ast.Constant)
@@ -351,16 +363,18 @@ def python_has_model_selector(text: str) -> bool:
     return False
 
 
-def installed_source_files() -> list[Path]:
-    return [
-        path
-        for path in PLUGIN.rglob("*")
-        if path.is_file()
-        and (
-            path.suffix in {".md", ".yaml", ".yml", ".json", ".py"}
-            or path.is_relative_to(PLUGIN / "bin")
-        )
-    ]
+def installed_source_files(root: Path = PLUGIN) -> list[Path]:
+    sources: list[Path] = []
+    for path in root.rglob("*"):
+        if not path.is_file() or "__pycache__" in path.parts:
+            continue
+        try:
+            text = read(path)
+        except UnicodeDecodeError:
+            continue
+        if "\x00" not in text:
+            sources.append(path)
+    return sources
 
 
 def has_model_selector(path: Path, text: str) -> bool:
@@ -374,10 +388,10 @@ def has_model_selector(path: Path, text: str) -> bool:
     return bool(MODEL_POLICY_SIGNAL.search(text) or MODEL_CONTROL.search(text))
 
 
-def model_selector_sources() -> set[Path]:
+def model_selector_sources(root: Path = PLUGIN) -> set[Path]:
     return {
         path.resolve()
-        for path in installed_source_files()
+        for path in installed_source_files(root)
         if has_model_selector(path, read(path))
     }
 
@@ -475,6 +489,23 @@ class SkillContractTest(unittest.TestCase):
         allowed = (PLUGIN / "references/claude-runtime.md").resolve()
         self.assertEqual({allowed}, model_selector_sources())
 
+    def test_installed_source_discovery_covers_every_utf8_text_type(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            shell = root / "policy.sh"
+            toml = root / "config.toml"
+            binary = root / "asset.bin"
+            invalid_utf8 = root / "invalid.bin"
+            shell.write_text('MODEL="nebula"', encoding="utf-8")
+            toml.write_text('model = "nebula"', encoding="utf-8")
+            binary.write_bytes(b"\x00MODEL=nebula\x00")
+            invalid_utf8.write_bytes(b"\xff\x00\xfe")
+
+            self.assertEqual({shell, toml}, set(installed_source_files(root)))
+            self.assertEqual(
+                {shell.resolve(), toml.resolve()}, model_selector_sources(root)
+            )
+
     def test_model_selector_sinks_are_family_agnostic_and_fail_closed(self) -> None:
         for path, policy in (
             (Path("policy.md"), "claude --model nebula"),
@@ -496,6 +527,11 @@ class SkillContractTest(unittest.TestCase):
             (Path("runtime.py"), 'launch = lambda model="nebula": None'),
             (Path("runtime.py"), 'setattr(config, "model", "nebula")'),
             (Path("runtime.py"), 'config.setdefault("model", "nebula")'),
+            (
+                Path("runtime.py"),
+                'parser.add_argument("-m", dest="model", default="nebula")',
+            ),
+            (Path("runtime.py"), 'parser.add_argument("-m", dest="model")'),
             (Path("runtime.py"), "model, runtime = resolve_identity()"),
             (Path("runtime.py"), 'model += "-fallback"'),
             (Path("agent.yaml"), "model: nebula"),
