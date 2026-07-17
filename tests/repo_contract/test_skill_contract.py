@@ -317,6 +317,15 @@ def python_has_model_selector(text: str) -> bool:
                 return True
         elif isinstance(node, ast.Call):
             if (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "setdefault"
+                and len(node.args) >= 2
+                and isinstance(node.args[0], ast.Constant)
+                and model_key(node.args[0].value)
+                and ast_value_selects_model(node.args[1])
+            ):
+                return True
+            if (
                 isinstance(node.func, ast.Name)
                 and node.func.id == "setattr"
                 and len(node.args) >= 3
@@ -486,6 +495,7 @@ class SkillContractTest(unittest.TestCase):
             (Path("runtime.py"), 'def launch(*, model="nebula"): pass'),
             (Path("runtime.py"), 'launch = lambda model="nebula": None'),
             (Path("runtime.py"), 'setattr(config, "model", "nebula")'),
+            (Path("runtime.py"), 'config.setdefault("model", "nebula")'),
             (Path("runtime.py"), "model, runtime = resolve_identity()"),
             (Path("runtime.py"), 'model += "-fallback"'),
             (Path("agent.yaml"), "model: nebula"),
@@ -526,6 +536,7 @@ class SkillContractTest(unittest.TestCase):
             (Path("runtime.py"), 'def launch(model="unknown"): pass'),
             (Path("runtime.py"), "def launch(*, model_id=None): pass"),
             (Path("runtime.py"), 'setattr(config, "model", "unknown")'),
+            (Path("runtime.py"), 'config.setdefault("model", "unknown")'),
             (Path("runtime.py"), 'parser.add_argument("--model-cache")'),
         ):
             with self.subTest(evidence=evidence):
