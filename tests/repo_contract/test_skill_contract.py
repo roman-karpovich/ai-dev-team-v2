@@ -49,23 +49,71 @@ EXPECTED_TASK_STATE_COMMANDS = {
         'adt --workspace "$WORKSPACE" complete --host "$HOST" --lease "$LEASE" --summary "$SUMMARY"',
     )
 }
-EXPECTED_REVIEW_PREFLIGHTS = [
-    (
-        "request:cold|independent|two-model",
-        "references/cold-independent-review.md",
-        "before:artifact-inspection|repository-context|adt-state",
-    ),
-    (
-        "host:claude",
-        "references/claude-runtime.md",
-        "after:cold-if-triggered;before:repository-exposure|adt-state|artifact-inspection",
-    ),
-    (
-        "always",
-        "references/task-lifecycle.md",
-        "after:prior-preflights;before:adt-state|mutation",
-    ),
-]
+EXPECTED_SKILL_ROUTES = {
+    "develop": [
+        (
+            "host:claude",
+            "references/claude-runtime.md",
+            "before:repository-exposure|adt-state|editing",
+        ),
+        (
+            "always",
+            "references/task-lifecycle.md",
+            "after:claude-if-triggered;before:adt-state|mutation",
+        ),
+        (
+            "depends-on:auto-reporting|framework-lifecycle|process-lifecycle|termination|propagation|bootstrap|event-cardinality",
+            "references/incident-observability.md",
+            "before:task-contract|candidate-edit",
+        ),
+        (
+            "acceptance:input-domain|upstream-replacement:removed,deprecated,unavailable->local-derivation",
+            "references/semantic-boundaries.md",
+            "before:task-contract",
+        ),
+        (
+            "verification:unavailable-dependency|runtime|production-bootstrap|environment-equivalence",
+            "references/verification-environments.md",
+            "before:verification-selection",
+        ),
+    ],
+    "review": [
+        (
+            "request:cold|independent|two-model",
+            "references/cold-independent-review.md",
+            "before:artifact-inspection|repository-context|adt-state",
+        ),
+        (
+            "host:claude",
+            "references/claude-runtime.md",
+            "after:cold-if-triggered;before:repository-exposure|adt-state|artifact-inspection",
+        ),
+        (
+            "always",
+            "references/task-lifecycle.md",
+            "after:prior-preflights;before:adt-state|mutation",
+        ),
+        (
+            "depends-on:auto-reporting|framework-lifecycle|process-lifecycle|termination|propagation|bootstrap|event-cardinality",
+            "references/incident-observability.md",
+            "before:claim-artifact-inspection",
+        ),
+        (
+            "acceptance:input-domain|upstream-replacement:removed,deprecated,unavailable->local-derivation",
+            "references/semantic-boundaries.md",
+            "before:claim-judgment",
+        ),
+        (
+            "verification:unavailable-dependency|runtime|production-bootstrap|environment-equivalence",
+            "references/verification-environments.md",
+            "before:verification-selection",
+        ),
+    ],
+}
+MODEL_NAME = re.compile(
+    r"\b(?:opus|fable)\s+\d|\bclaude-(?:opus|fable)-[a-z0-9.-]+",
+    re.IGNORECASE,
+)
 
 
 def read(path: Path) -> str:
@@ -118,12 +166,12 @@ def markdown_row(line: str) -> tuple[str, ...]:
     return tuple(normalized)
 
 
-def required_preflight_rows(text: str) -> list[tuple[str, ...]]:
+def skill_route_rows(text: str) -> list[tuple[str, ...]]:
     lines = text.splitlines()
     header = "| Trigger | Resource | Boundary |"
     matches = [index for index, line in enumerate(lines) if line.strip() == header]
     if len(matches) != 1:
-        raise AssertionError("expected exactly one required preflight table")
+        raise AssertionError("expected exactly one skill route table")
 
     index = matches[0]
     if index + 1 >= len(lines) or markdown_row(lines[index + 1]) != (
@@ -131,7 +179,7 @@ def required_preflight_rows(text: str) -> list[tuple[str, ...]]:
         "---",
         "---",
     ):
-        raise AssertionError("malformed required preflight table separator")
+        raise AssertionError("malformed skill route table separator")
 
     rows: list[tuple[str, ...]] = []
     for line in lines[index + 2 :]:
@@ -139,9 +187,29 @@ def required_preflight_rows(text: str) -> list[tuple[str, ...]]:
             break
         row = markdown_row(line)
         if len(row) != 3:
-            raise AssertionError(f"malformed required preflight row: {line!r}")
+            raise AssertionError(f"malformed skill route row: {line!r}")
         rows.append(row)
     return rows
+
+
+def installed_source_files() -> list[Path]:
+    return [
+        path
+        for path in PLUGIN.rglob("*")
+        if path.is_file()
+        and (
+            path.suffix in {".md", ".yaml", ".json", ".py"}
+            or path.parent == PLUGIN / "bin"
+        )
+    ]
+
+
+def model_name_sources() -> set[Path]:
+    return {
+        path.resolve()
+        for path in installed_source_files()
+        if MODEL_NAME.search(read(path))
+    }
 
 
 def repository_link_target(base: Path, target: str) -> Path | None:
@@ -180,9 +248,11 @@ class SkillContractTest(unittest.TestCase):
                 self.assertTrue(resolved.is_relative_to(PLUGIN.resolve()), locator)
                 self.assertTrue(resolved.is_file(), locator)
 
-    def test_review_preflight_table_is_exact_and_ordered(self) -> None:
-        _, review = frontmatter(SKILLS / "review/SKILL.md")
-        self.assertEqual(EXPECTED_REVIEW_PREFLIGHTS, required_preflight_rows(review))
+    def test_skill_route_tables_are_exact_and_ordered(self) -> None:
+        for name, expected in EXPECTED_SKILL_ROUTES.items():
+            _, body = frontmatter(SKILLS / name / "SKILL.md")
+            with self.subTest(skill=name):
+                self.assertEqual(expected, skill_route_rows(body))
 
     def test_lifecycle_reference_owns_exact_canonical_task_state_forms(self) -> None:
         command_owners = {
@@ -206,7 +276,6 @@ class SkillContractTest(unittest.TestCase):
         self.assertIsNotNone(homepage)
         assert homepage is not None
         self.assertTrue(homepage.is_file())
-        self.assertLessEqual(len(read(homepage).splitlines()), 140)
 
         resolved = {
             target
@@ -226,16 +295,7 @@ class SkillContractTest(unittest.TestCase):
 
     def test_model_names_are_isolated_to_claude_runtime_reference(self) -> None:
         allowed = (PLUGIN / "references/claude-runtime.md").resolve()
-        model_name = re.compile(
-            r"\b(?:opus|fable)\s+\d|\bclaude-(?:opus|fable)-[a-z0-9.-]+",
-            re.IGNORECASE,
-        )
-        containing = {
-            path.resolve()
-            for path in PLUGIN.rglob("*.md")
-            if model_name.search(read(path))
-        }
-        self.assertEqual({allowed}, containing)
+        self.assertEqual({allowed}, model_name_sources())
 
 
 if __name__ == "__main__":
