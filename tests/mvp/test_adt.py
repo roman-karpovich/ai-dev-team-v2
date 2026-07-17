@@ -84,6 +84,21 @@ class AdtCliTest(unittest.TestCase):
         self.assertEqual(1, len(matches))
         return matches[0], json.loads(matches[0].read_text())
 
+    def _load_runtime(self):
+        spec = importlib.util.spec_from_file_location("adt_under_test", ADT)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        runtime = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = runtime
+        self.addCleanup(sys.modules.pop, spec.name, None)
+        previous_dont_write_bytecode = sys.dont_write_bytecode
+        sys.dont_write_bytecode = True
+        try:
+            spec.loader.exec_module(runtime)
+        finally:
+            sys.dont_write_bytecode = previous_dont_write_bytecode
+        return runtime
+
     def test_start_and_context_create_common_git_state(self) -> None:
         started = self._start()
 
@@ -184,18 +199,7 @@ class AdtCliTest(unittest.TestCase):
         self.assertEqual(lock_mtime_before, lock_mtime_after)
 
     def test_mutation_lock_remains_exclusive(self) -> None:
-        spec = importlib.util.spec_from_file_location("adt_under_test", ADT)
-        self.assertIsNotNone(spec)
-        self.assertIsNotNone(spec.loader)
-        runtime = importlib.util.module_from_spec(spec)
-        sys.modules[spec.name] = runtime
-        self.addCleanup(sys.modules.pop, spec.name, None)
-        previous_dont_write_bytecode = sys.dont_write_bytecode
-        sys.dont_write_bytecode = True
-        try:
-            spec.loader.exec_module(runtime)
-        finally:
-            sys.dont_write_bytecode = previous_dont_write_bytecode
+        runtime = self._load_runtime()
 
         workspace = runtime.GitWorkspace(
             root=self.repo,
@@ -213,6 +217,139 @@ class AdtCliTest(unittest.TestCase):
             with store.lock(shared=True):
                 pass
             self.assertEqual(fcntl.LOCK_SH, flock.call_args_list[0].args[1])
+
+    def test_linked_worktree_lock_failure_reports_state_unavailable(self) -> None:
+        runtime = self._load_runtime()
+        linked_worktree = Path(self.temp_dir.name) / "linked"
+        self._git("worktree", "add", "-q", "-b", "diagnostic", str(linked_worktree))
+        workspace = runtime.GitWorkspace.discover(linked_worktree)
+        self.assertEqual((self.repo / ".git").resolve(), workspace.common_dir)
+        store = runtime.StateStore(workspace)
+
+        with mock.patch.object(
+            runtime.Path,
+            "mkdir",
+            side_effect=PermissionError("private machine path"),
+        ):
+            with self.assertRaises(runtime.CliError) as raised:
+                with store.lock():
+                    self.fail("lock must not be acquired")
+
+        self.assertEqual("state_unavailable", raised.exception.code)
+        self.assertEqual(
+            "ADT needs read/write access to its state directory under the "
+            "common Git directory.",
+            raised.exception.message,
+        )
+        self.assertNotIn("private machine path", raised.exception.message)
+
+    def test_lock_cleanup_does_not_overwrite_body_cli_error(self) -> None:
+        runtime = self._load_runtime()
+        workspace = runtime.GitWorkspace(
+            root=self.repo,
+            common_dir=self.repo / ".git",
+            workspace_id="cleanup-failure",
+        )
+        store = runtime.StateStore(workspace)
+
+        original = runtime.CliError("body_error", "Preserve this error.")
+        with self.subTest(operation="unlock"):
+            with mock.patch.object(
+                runtime.fcntl,
+                "flock",
+                side_effect=[None, OSError("unlock failed")],
+            ):
+                with self.assertRaises(runtime.CliError) as raised:
+                    with store.lock():
+                        raise original
+            self.assertIs(original, raised.exception)
+
+        lock_file = mock.Mock()
+        lock_file.fileno.return_value = 42
+        lock_file.close.side_effect = OSError("close failed")
+        with self.subTest(operation="close"):
+            with (
+                mock.patch.object(runtime.Path, "open", return_value=lock_file),
+                mock.patch.object(runtime.os, "chmod"),
+                mock.patch.object(runtime.fcntl, "flock"),
+            ):
+                with self.assertRaises(runtime.CliError) as raised:
+                    with store.lock():
+                        raise original
+            self.assertIs(original, raised.exception)
+
+    def test_state_save_failure_reports_state_unavailable_without_path(self) -> None:
+        runtime = self._load_runtime()
+        workspace = runtime.GitWorkspace(
+            root=self.repo,
+            common_dir=self.repo / ".git",
+            workspace_id="save-unavailable",
+        )
+        store = runtime.StateStore(workspace)
+
+        with mock.patch.object(
+            runtime.tempfile,
+            "mkstemp",
+            side_effect=PermissionError("private machine path"),
+        ):
+            with self.assertRaises(runtime.CliError) as raised:
+                store.save({"schema_version": runtime.SCHEMA_VERSION})
+
+        self.assertEqual("state_unavailable", raised.exception.code)
+        self.assertEqual(
+            "ADT needs read/write access to its state directory under the "
+            "common Git directory.",
+            raised.exception.message,
+        )
+        self.assertNotIn("private machine path", raised.exception.message)
+
+    def test_state_save_cleans_temp_and_preserves_state_when_replace_fails(self) -> None:
+        runtime = self._load_runtime()
+        workspace = runtime.GitWorkspace(
+            root=self.repo,
+            common_dir=self.repo / ".git",
+            workspace_id="atomic-save-failure",
+        )
+        store = runtime.StateStore(workspace)
+        store.directory.mkdir(parents=True)
+        original = b"existing state\n"
+        store.state_path.write_bytes(original)
+
+        with mock.patch.object(
+            runtime.os,
+            "replace",
+            side_effect=OSError("replace failed"),
+        ):
+            with self.assertRaises(runtime.CliError) as raised:
+                store.save({"schema_version": runtime.SCHEMA_VERSION})
+
+        self.assertEqual("state_unavailable", raised.exception.code)
+        self.assertEqual(original, store.state_path.read_bytes())
+        self.assertEqual([], list(store.directory.glob("state.*.tmp")))
+
+    def test_state_read_failure_is_unavailable_not_corrupt(self) -> None:
+        runtime = self._load_runtime()
+        workspace = runtime.GitWorkspace(
+            root=self.repo,
+            common_dir=self.repo / ".git",
+            workspace_id="read-unavailable",
+        )
+        store = runtime.StateStore(workspace)
+
+        with (
+            mock.patch.object(runtime.Path, "stat", return_value=mock.Mock()),
+            mock.patch.object(
+                runtime.Path,
+                "read_text",
+                side_effect=PermissionError("private machine path"),
+            ),
+        ):
+            with self.assertRaises(runtime.CliError) as raised:
+                store.load()
+
+        self.assertEqual("state_unavailable", raised.exception.code)
+        self.assertNotEqual("state_corrupt", raised.exception.code)
+        self.assertNotIn("private machine path", raised.exception.message)
 
     def test_start_records_explicit_kind_and_profile_without_routing(self) -> None:
         payload, _ = self._adt(

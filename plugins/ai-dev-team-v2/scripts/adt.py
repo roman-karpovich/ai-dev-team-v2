@@ -26,6 +26,10 @@ SNAPSHOT_FORMAT_VERSION = 2
 STATE_NAMESPACE = "ai-dev-team"
 OPEN_STATUSES = frozenset({"active", "paused"})
 REVIEW_HOLD_EXIT_CODE = 5
+STATE_UNAVAILABLE_MESSAGE = (
+    "ADT needs read/write access to its state directory under the common Git "
+    "directory."
+)
 
 
 class CliError(Exception):
@@ -84,28 +88,78 @@ class StateStore:
         self.state_path = self.directory / "state.json"
         self.lock_path = self.directory / "state.lock"
 
+    def exists(self) -> bool:
+        try:
+            self.state_path.stat()
+        except FileNotFoundError:
+            return False
+        except OSError as error:
+            raise CliError(
+                "state_unavailable",
+                STATE_UNAVAILABLE_MESSAGE,
+                exit_code=4,
+            ) from error
+        return True
+
     @contextlib.contextmanager
     def lock(self, *, shared: bool = False) -> Iterator[None]:
-        if not shared:
-            self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
-        with self.lock_path.open("rb" if shared else "a+b") as lock_file:
+        lock_file = None
+        try:
+            if not shared:
+                self.directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+            lock_file = self.lock_path.open("rb" if shared else "a+b")
             if not shared:
                 os.chmod(self.lock_path, 0o600)
             fcntl.flock(
                 lock_file.fileno(),
                 fcntl.LOCK_SH if shared else fcntl.LOCK_EX,
             )
+        except OSError as error:
+            if lock_file is not None:
+                with contextlib.suppress(OSError):
+                    lock_file.close()
+            raise CliError(
+                "state_unavailable",
+                STATE_UNAVAILABLE_MESSAGE,
+                exit_code=4,
+            ) from error
+        assert lock_file is not None
+        body_failed = False
+        try:
+            yield
+        except BaseException:
+            body_failed = True
+            raise
+        finally:
+            cleanup_error = None
             try:
-                yield
-            finally:
                 fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            except OSError as error:
+                cleanup_error = error
+            try:
+                lock_file.close()
+            except OSError as error:
+                if cleanup_error is None:
+                    cleanup_error = error
+            if cleanup_error is not None and not body_failed:
+                raise CliError(
+                    "state_unavailable",
+                    STATE_UNAVAILABLE_MESSAGE,
+                    exit_code=4,
+                ) from cleanup_error
 
     def load(self) -> dict[str, Any] | None:
-        if not self.state_path.exists():
+        if not self.exists():
             return None
         try:
             value = json.loads(self.state_path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        except OSError as error:
+            raise CliError(
+                "state_unavailable",
+                STATE_UNAVAILABLE_MESSAGE,
+                exit_code=4,
+            ) from error
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
             raise CliError(
                 "state_corrupt",
                 "The workspace state cannot be read as valid JSON.",
@@ -142,10 +196,12 @@ class StateStore:
             )
             + "\n"
         ).encode("utf-8")
-        descriptor, temporary_name = tempfile.mkstemp(
-            prefix="state.", suffix=".tmp", dir=self.directory
-        )
+        descriptor = -1
+        temporary_name: str | None = None
         try:
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix="state.", suffix=".tmp", dir=self.directory
+            )
             os.fchmod(descriptor, 0o600)
             with os.fdopen(descriptor, "wb") as temporary_file:
                 descriptor = -1
@@ -158,11 +214,19 @@ class StateStore:
                 os.fsync(directory_descriptor)
             finally:
                 os.close(directory_descriptor)
+        except OSError as error:
+            raise CliError(
+                "state_unavailable",
+                STATE_UNAVAILABLE_MESSAGE,
+                exit_code=4,
+            ) from error
         finally:
             if descriptor >= 0:
-                os.close(descriptor)
-            with contextlib.suppress(FileNotFoundError):
-                os.unlink(temporary_name)
+                with contextlib.suppress(OSError):
+                    os.close(descriptor)
+            if temporary_name is not None:
+                with contextlib.suppress(OSError):
+                    os.unlink(temporary_name)
 
 
 def _git_bytes(workspace: Path, *arguments: str, allow_failure: bool = False) -> bytes:
@@ -610,7 +674,7 @@ def _load_existing(store: StateStore) -> dict[str, Any]:
 def command_status(
     command: str, workspace: GitWorkspace, store: StateStore
 ) -> dict[str, Any]:
-    if not store.state_path.exists():
+    if not store.exists():
         raise CliError("no_task", "No task state exists in this workspace.")
     with store.lock(shared=True):
         state_value = _load_existing(store)
@@ -633,7 +697,7 @@ def command_status(
 
 
 def command_list(workspace: GitWorkspace, store: StateStore) -> dict[str, Any]:
-    if not store.state_path.exists():
+    if not store.exists():
         return _success("list", workspace, revision=0, current_task_id=None, tasks=[])
     with store.lock(shared=True):
         state_value = _load_existing(store)
