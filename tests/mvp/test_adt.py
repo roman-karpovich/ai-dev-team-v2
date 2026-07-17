@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import fcntl
 import importlib.util
 import json
@@ -358,6 +359,8 @@ class AdtCliTest(unittest.TestCase):
     def test_state_load_rejects_malformed_unsupported_and_invalid_shapes(self) -> None:
         self._start()
         state_path, baseline = self._stored_state()
+        duplicate_tasks = copy.deepcopy(baseline["tasks"])
+        duplicate_tasks.append(copy.deepcopy(duplicate_tasks[0]))
         cases = (
             ("malformed-json", "{", "state_corrupt"),
             ("non-object", json.dumps([]), "state_version_unsupported"),
@@ -372,8 +375,48 @@ class AdtCliTest(unittest.TestCase):
                 "state_corrupt",
             ),
             (
+                "empty-workspace",
+                json.dumps({**baseline, "workspace": {}}),
+                "state_corrupt",
+            ),
+            (
+                "invalid-workspace-id",
+                json.dumps(
+                    {
+                        **baseline,
+                        "workspace": {**baseline["workspace"], "id": "bad"},
+                    }
+                ),
+                "state_corrupt",
+            ),
+            (
+                "valid-different-workspace-id",
+                json.dumps(
+                    {
+                        **baseline,
+                        "workspace": {**baseline["workspace"], "id": "0" * 24},
+                    }
+                ),
+                "workspace_mismatch",
+            ),
+            (
+                "invalid-workspace-root",
+                json.dumps(
+                    {
+                        **baseline,
+                        "workspace": {**baseline["workspace"], "root": []},
+                    }
+                ),
+                "state_corrupt",
+            ),
+            (
                 "invalid-tasks-shape",
                 json.dumps({**baseline, "tasks": {}}),
+                "state_corrupt",
+            ),
+            (
+                "duplicate-task-ids",
+                json.dumps({**baseline, "tasks": duplicate_tasks}),
                 "state_corrupt",
             ),
         )
@@ -384,30 +427,252 @@ class AdtCliTest(unittest.TestCase):
                 error, _ = self._adt("status", expected_code=4)
                 self.assertEqual(expected_code, error["error"]["code"])
 
-    def test_state_load_rejects_malformed_current_task_shapes(self) -> None:
-        self._start()
+    def test_state_load_rejects_malformed_persisted_task_shapes(self) -> None:
+        started = self._start()
+        (self.repo / "app.txt").write_text("changed before checkpoint\n")
+        self._adt(
+            "checkpoint",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+            "--note",
+            "Keep this note",
+        )
+        self._adt(
+            "takeover",
+            "--host",
+            "codex",
+            "--reason",
+            "Fresh local session",
+        )
         state_path, baseline = self._stored_state()
-        task_id = baseline["current_task_id"]
-        task = baseline["tasks"][0]
         private_marker = "/private/machine/state.json"
+
+        def changed(path: tuple[object, ...], value: object) -> dict[str, object]:
+            state_value = copy.deepcopy(baseline)
+            target = state_value
+            for part in path[:-1]:
+                target = target[part]
+            target[path[-1]] = value
+            return state_value
+
+        def added(
+            path: tuple[object, ...], key: str, value: object
+        ) -> dict[str, object]:
+            state_value = copy.deepcopy(baseline)
+            target = state_value
+            for part in path:
+                target = target[part]
+            target[key] = value
+            return state_value
+
+        def task_changed(**values: object) -> dict[str, object]:
+            state_value = copy.deepcopy(baseline)
+            state_value["tasks"][0].update(values)
+            return state_value
+
+        def checkpoint_changed(**values: object) -> dict[str, object]:
+            state_value = copy.deepcopy(baseline)
+            state_value["tasks"][0]["checkpoints"][0].update(values)
+            return state_value
+
+        def removed(path: tuple[object, ...]) -> dict[str, object]:
+            state_value = copy.deepcopy(baseline)
+            target = state_value
+            for part in path[:-1]:
+                target = target[part]
+            del target[path[-1]]
+            return state_value
+
+        task_path = ("tasks", 0)
+        checkpoint_path = (*task_path, "checkpoints", 0)
+        takeover_path = (*task_path, "takeovers", 0)
+        snapshot_entry_path = (*task_path, "snapshot", "changes", "entries", 0)
+        checkpoint_entry_path = (
+            *checkpoint_path,
+            "snapshot",
+            "changes",
+            "entries",
+            0,
+        )
+        fingerprint_path = (*snapshot_entry_path, "worktree")
         cases = (
-            ("revision", {**baseline, "revision": private_marker}),
-            ("current-task-id", {**baseline, "current_task_id": []}),
-            ("missing-current-task", {**baseline, "tasks": []}),
+            ("revision-bool", changed(("revision",), True)),
+            ("revision-negative", changed(("revision",), -1)),
+            ("revision-too-small", changed(("revision",), 2)),
+            ("state-created-at", changed(("created_at",), [])),
+            ("state-updated-at", changed(("updated_at",), None)),
+            ("missing-current-task-id", removed(("current_task_id",))),
+            ("current-task-id", changed(("current_task_id",), [])),
+            ("null-current-with-history", changed(("current_task_id",), None)),
+            ("task-entry", changed(task_path, [])),
+            ("task-id", changed((*task_path, "id"), private_marker)),
+            ("missing-resume-host", removed((*task_path, "resume_host"))),
+            ("task-kind", changed((*task_path, "kind"), [])),
+            ("task-profile", changed((*task_path, "profile"), "unknown")),
+            ("task-goal", changed((*task_path, "goal"), "")),
+            ("task-status", changed((*task_path, "status"), "unknown")),
+            ("task-created-at", changed((*task_path, "created_at"), None)),
+            ("task-updated-at", changed((*task_path, "updated_at"), [])),
+            ("active-lease", changed((*task_path, "lease"), None)),
+            ("paused-with-lease", task_changed(status="paused")),
             (
-                "current-task",
-                {**baseline, "tasks": [{"id": task_id, "snapshot": []}]},
+                "paused-without-resume-host",
+                task_changed(status="paused", lease=None, resume_host=None),
             ),
             (
-                "snapshot",
-                {
-                    **baseline,
-                    "tasks": [{**task, "snapshot": {"digest": [private_marker]}}],
-                },
+                "completed-without-completed-at",
+                task_changed(status="completed", lease=None, resume_host=None),
+            ),
+            ("lease-id", changed((*task_path, "lease", "id"), "bad")),
+            ("lease-host", changed((*task_path, "lease", "host"), [])),
+            (
+                "lease-acquired-at",
+                changed((*task_path, "lease", "acquired_at"), []),
+            ),
+            ("active-resume-host", changed((*task_path, "resume_host"), "claude")),
+            ("snapshot-shape", changed((*task_path, "snapshot"), [])),
+            (
+                "snapshot-version",
+                changed((*task_path, "snapshot", "format_version"), True),
             ),
             (
-                "checkpoints",
-                {**baseline, "tasks": [{**task, "checkpoints": private_marker}]},
+                "snapshot-digest",
+                changed((*task_path, "snapshot", "digest"), private_marker),
+            ),
+            ("snapshot-head", changed((*task_path, "snapshot", "head"), [])),
+            ("snapshot-dirty", changed((*task_path, "snapshot", "dirty"), 1)),
+            ("snapshot-changes", changed((*task_path, "snapshot", "changes"), [])),
+            (
+                "snapshot-change-count",
+                changed((*task_path, "snapshot", "changes", "total"), 2),
+            ),
+            ("snapshot-entry", changed(snapshot_entry_path, [])),
+            ("snapshot-entry-status", changed((*snapshot_entry_path, "status"), [])),
+            (
+                "snapshot-entry-impossible-clean-status",
+                changed((*snapshot_entry_path, "status"), "  "),
+            ),
+            (
+                "snapshot-entry-invalid-status-combination",
+                changed((*snapshot_entry_path, "status"), "MA"),
+            ),
+            ("snapshot-entry-path", changed((*snapshot_entry_path, "path"), [])),
+            ("snapshot-entry-index", changed((*snapshot_entry_path, "index"), {})),
+            (
+                "snapshot-entry-index-item",
+                changed((*snapshot_entry_path, "index", 0), []),
+            ),
+            (
+                "snapshot-entry-worktree",
+                changed((*snapshot_entry_path, "worktree"), []),
+            ),
+            ("fingerprint-mode", changed((*fingerprint_path, "mode"), [])),
+            ("fingerprint-size", changed((*fingerprint_path, "size"), True)),
+            ("fingerprint-kind", changed((*fingerprint_path, "kind"), "unknown")),
+            ("fingerprint-digest", changed((*fingerprint_path, "sha256"), "bad")),
+            (
+                "incomplete-original-entry",
+                added(snapshot_entry_path, "original_path", "old-app.txt"),
+            ),
+            (
+                "rename-without-original-fields",
+                changed((*snapshot_entry_path, "status"), "R "),
+            ),
+            ("checkpoints", changed((*task_path, "checkpoints"), private_marker)),
+            ("checkpoint-shape", changed(checkpoint_path, [])),
+            ("checkpoint-id", changed((*checkpoint_path, "id"), "bad")),
+            ("checkpoint-sequence", changed((*checkpoint_path, "sequence"), 2)),
+            ("checkpoint-kind", changed((*checkpoint_path, "kind"), [])),
+            ("checkpoint-host", changed((*checkpoint_path, "host"), [])),
+            (
+                "checkpoint-created-at",
+                changed((*checkpoint_path, "created_at"), None),
+            ),
+            ("checkpoint-snapshot", changed((*checkpoint_path, "snapshot"), [])),
+            (
+                "checkpoint-snapshot-entry",
+                changed((*checkpoint_entry_path, "status"), []),
+            ),
+            ("checkpoint-note", changed((*checkpoint_path, "note"), [])),
+            (
+                "checkpoint-target-host",
+                added(checkpoint_path, "target_host", []),
+            ),
+            (
+                "manual-target-host",
+                added(checkpoint_path, "target_host", "claude"),
+            ),
+            (
+                "checkpoint-previous-digest",
+                added(checkpoint_path, "previous_digest", []),
+            ),
+            (
+                "manual-previous-digest",
+                added(
+                    checkpoint_path,
+                    "previous_digest",
+                    "sha256:" + "0" * 64,
+                ),
+            ),
+            (
+                "handoff-missing-target-host",
+                changed((*checkpoint_path, "kind"), "handoff"),
+            ),
+            (
+                "drift-missing-previous-digest",
+                changed((*checkpoint_path, "kind"), "drift-accepted"),
+            ),
+            (
+                "drift-invalid-previous-digest",
+                checkpoint_changed(
+                    kind="drift-accepted",
+                    previous_digest=private_marker,
+                ),
+            ),
+            (
+                "drift-target-host",
+                checkpoint_changed(
+                    kind="drift-accepted",
+                    previous_digest="sha256:" + "0" * 64,
+                    target_host="claude",
+                ),
+            ),
+            ("takeovers", changed((*task_path, "takeovers"), private_marker)),
+            ("takeover-shape", changed(takeover_path, [])),
+            ("takeover-host", changed((*takeover_path, "host"), [])),
+            (
+                "takeover-created-at",
+                changed((*takeover_path, "created_at"), None),
+            ),
+            ("takeover-reason", changed((*takeover_path, "reason"), [])),
+            ("optional-summary", changed((*task_path, "summary"), [])),
+            ("optional-completed-at", added(task_path, "completed_at", [])),
+            (
+                "active-stale-completed-at",
+                added(task_path, "completed_at", "2026-07-17T00:00:00Z"),
+            ),
+            ("active-stale-summary", added(task_path, "summary", "stale")),
+            (
+                "paused-stale-summary",
+                task_changed(
+                    status="paused",
+                    lease=None,
+                    resume_host="codex",
+                    summary="stale",
+                ),
+            ),
+            (
+                "active-complete-terminal-checkpoint",
+                changed((*checkpoint_path, "kind"), "complete"),
+            ),
+            (
+                "task-checkpoint-snapshot-mismatch",
+                changed(
+                    (*task_path, "snapshot", "digest"),
+                    "sha256:" + "0" * 64,
+                ),
             ),
         )
 
@@ -437,16 +702,328 @@ class AdtCliTest(unittest.TestCase):
 
         self.assertEqual("state_corrupt", error["error"]["code"])
 
-    def test_null_current_task_does_not_match_malformed_task(self) -> None:
-        self._start()
-        state_path, baseline = self._stored_state()
-        state_path.write_text(
-            json.dumps({**baseline, "current_task_id": None, "tasks": [{}]})
+    def test_start_rejects_corrupt_retained_history_without_mutating_it(self) -> None:
+        started = self._start()
+        (self.repo / "app.txt").write_text("changed before completion\n")
+        self._adt(
+            "complete",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+        )
+        state_path, state_value = self._stored_state()
+        task = state_value["tasks"][0]
+        task["snapshot"]["changes"]["entries"][0]["status"] = []
+        task["checkpoints"][-1]["snapshot"]["changes"]["entries"][0][
+            "status"
+        ] = []
+        state_path.write_text(json.dumps(state_value))
+        corrupt_bytes = state_path.read_bytes()
+
+        error, _ = self._adt(
+            "start",
+            "--host",
+            "claude",
+            "--goal",
+            "Do not append over corrupt history",
+            expected_code=4,
         )
 
-        error, _ = self._adt("status", expected_code=3)
+        self.assertEqual("state_corrupt", error["error"]["code"])
+        self.assertEqual(corrupt_bytes, state_path.read_bytes())
 
-        self.assertEqual("no_task", error["error"]["code"])
+    def test_completed_task_relations_are_validated(self) -> None:
+        started = self._start()
+        self._adt(
+            "complete",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+            "--summary",
+            "Delivered",
+        )
+        state_path, baseline = self._stored_state()
+
+        def changed(path: tuple[object, ...], value: object) -> dict[str, object]:
+            state_value = copy.deepcopy(baseline)
+            target = state_value
+            for part in path[:-1]:
+                target = target[part]
+            target[path[-1]] = value
+            return state_value
+
+        task_path = ("tasks", 0)
+        checkpoint_path = (*task_path, "checkpoints", 0)
+        cases = (
+            ("terminal-kind", changed((*checkpoint_path, "kind"), "manual")),
+            (
+                "completed-at",
+                changed((*task_path, "completed_at"), "2026-07-17T00:00:00Z"),
+            ),
+            (
+                "updated-at",
+                changed((*task_path, "updated_at"), "2026-07-17T00:00:00Z"),
+            ),
+            ("summary", changed((*task_path, "summary"), "Different")),
+            (
+                "snapshot",
+                changed(
+                    (*task_path, "snapshot", "digest"),
+                    "sha256:" + "0" * 64,
+                ),
+            ),
+        )
+
+        for label, state_value in cases:
+            with self.subTest(case=label):
+                state_path.write_text(json.dumps(state_value))
+                error, _ = self._adt("status", expected_code=4)
+                self.assertEqual("state_corrupt", error["error"]["code"])
+
+    def test_snapshot_validator_accepts_rename_and_missing_worktree_shapes(
+        self,
+    ) -> None:
+        removed = self.repo / "removed.txt"
+        removed.write_text("remove after task starts\n")
+        self._git("add", "removed.txt")
+        self._git("commit", "-qm", "add removal candidate")
+        started = self._start()
+        self._git("mv", "app.txt", "renamed.txt")
+        removed.unlink()
+
+        checkpoint, _ = self._adt(
+            "checkpoint",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+        )
+        context, _ = self._adt("context")
+
+        entries = checkpoint["checkpoint"]["snapshot"]["changes"]["entries"]
+        renamed = next(entry for entry in entries if "R" in entry["status"])
+        deleted = next(entry for entry in entries if entry["path"] == "removed.txt")
+        self.assertIsNone(renamed["original_worktree"])
+        self.assertIsNone(deleted["worktree"])
+        self.assertEqual(
+            checkpoint["checkpoint"]["snapshot"], context["task"]["snapshot"]
+        )
+
+        state_path, state_value = self._stored_state()
+        task = state_value["tasks"][0]
+        snapshots = (task["snapshot"], task["checkpoints"][-1]["snapshot"])
+        for snapshot in snapshots:
+            renamed_entry = next(
+                entry
+                for entry in snapshot["changes"]["entries"]
+                if "R" in entry["status"]
+            )
+            renamed_entry["status"] = renamed_entry["status"].replace("R", "C")
+        state_path.write_text(json.dumps(state_value))
+        copied, _ = self._adt("context")
+        self.assertTrue(
+            any(
+                "C" in entry["status"]
+                for entry in copied["task"]["snapshot"]["changes"]["entries"]
+            )
+        )
+
+        invalid_cases = ("original_worktree", "original_index")
+        for field in invalid_cases:
+            with self.subTest(copy_field=field):
+                malformed = copy.deepcopy(state_value)
+                task = malformed["tasks"][0]
+                for snapshot in (
+                    task["snapshot"],
+                    task["checkpoints"][-1]["snapshot"],
+                ):
+                    copied_entry = next(
+                        entry
+                        for entry in snapshot["changes"]["entries"]
+                        if "C" in entry["status"]
+                    )
+                    if field == "original_worktree":
+                        copied_entry[field] = []
+                    else:
+                        del copied_entry[field]
+                state_path.write_text(json.dumps(malformed))
+                error, _ = self._adt("status", expected_code=4)
+                self.assertEqual("state_corrupt", error["error"]["code"])
+
+    def test_paused_task_terminal_checkpoint_relations_are_validated(self) -> None:
+        started = self._start()
+        self._adt(
+            "pause",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+        )
+        state_path, paused = self._stored_state()
+
+        pause_cases = (
+            ("terminal-kind", {"kind": "manual"}, {}),
+            ("resume-host", {}, {"resume_host": "claude"}),
+            ("pause-target-host", {"target_host": "codex"}, {}),
+        )
+        for label, checkpoint_values, task_values in pause_cases:
+            with self.subTest(kind="pause", case=label):
+                state_value = copy.deepcopy(paused)
+                task = state_value["tasks"][0]
+                task["checkpoints"][-1].update(checkpoint_values)
+                task.update(task_values)
+                state_path.write_text(json.dumps(state_value))
+                error, _ = self._adt("status", expected_code=4)
+                self.assertEqual("state_corrupt", error["error"]["code"])
+
+        state_path.write_text(json.dumps(paused))
+        resumed, _ = self._adt("resume", "--host", "codex")
+        self._adt(
+            "handoff",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(resumed),
+            "--to",
+            "claude",
+        )
+        state_path, handed_off = self._stored_state()
+        handoff_cases = (
+            ("terminal-kind", {"kind": "manual"}, {}),
+            ("missing-target-host", {"target_host": None}, {}),
+            ("resume-host", {}, {"resume_host": "codex"}),
+            ("handoff-previous-digest", {"previous_digest": "sha256:" + "0" * 64}, {}),
+            (
+                "whitespace-hosts",
+                {"target_host": " \t"},
+                {"resume_host": " \t"},
+            ),
+            (
+                "unnormalized-hosts",
+                {"target_host": " claude "},
+                {"resume_host": " claude "},
+            ),
+        )
+        for label, checkpoint_values, task_values in handoff_cases:
+            with self.subTest(kind="handoff", case=label):
+                state_value = copy.deepcopy(handed_off)
+                task = state_value["tasks"][0]
+                task["checkpoints"][-1].update(checkpoint_values)
+                task.update(task_values)
+                state_path.write_text(json.dumps(state_value))
+                error, _ = self._adt("status", expected_code=4)
+                self.assertEqual("state_corrupt", error["error"]["code"])
+
+    def test_active_resume_accepts_pause_and_handoff_terminal_history(self) -> None:
+        started = self._start()
+        paused, _ = self._adt(
+            "pause",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+        )
+        resumed, _ = self._adt("resume", "--host", "codex")
+        status, _ = self._adt("status")
+        self.assertEqual("pause", paused["checkpoint"]["kind"])
+        self.assertEqual("active", status["task"]["status"])
+
+        handed_off, _ = self._adt(
+            "handoff",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(resumed),
+            "--to",
+            "claude",
+        )
+        self._adt("resume", "--host", "claude")
+        status, _ = self._adt("status")
+        self.assertEqual("handoff", handed_off["checkpoint"]["kind"])
+        self.assertEqual("active", status["task"]["status"])
+
+    def test_state_load_accepts_only_legal_porcelain_v1_status_pairs(self) -> None:
+        (self.repo / "app.txt").write_text("dirty before task start\n")
+        self._start()
+        state_path, baseline = self._stored_state()
+        legal_statuses = (
+            " M",
+            "M ",
+            " T",
+            "T ",
+            " A",
+            "A ",
+            " D",
+            "D ",
+            " R",
+            "R ",
+            " C",
+            "C ",
+            "DD",
+            "AU",
+            "UD",
+            "UA",
+            "DU",
+            "AA",
+            "UU",
+            "??",
+            "!!",
+        )
+        for status in legal_statuses:
+            with self.subTest(legal=status):
+                state_value = copy.deepcopy(baseline)
+                entry = state_value["tasks"][0]["snapshot"]["changes"]["entries"][0]
+                entry["status"] = status
+                if "R" in status or "C" in status:
+                    entry["original_path"] = "old-app.txt"
+                    entry["original_index"] = copy.deepcopy(entry["index"])
+                    entry["original_worktree"] = copy.deepcopy(entry["worktree"])
+                state_path.write_text(json.dumps(state_value))
+                listed, _ = self._adt("list")
+                self.assertEqual(1, len(listed["tasks"]))
+
+        for status in ("  ", "MA", "MR", "MC", "U ", "DM", "!?"):
+            with self.subTest(invalid=status):
+                state_value = copy.deepcopy(baseline)
+                state_value["tasks"][0]["snapshot"]["changes"]["entries"][0][
+                    "status"
+                ] = status
+                state_path.write_text(json.dumps(state_value))
+                error, _ = self._adt("list", expected_code=4)
+                self.assertEqual("state_corrupt", error["error"]["code"])
+
+    def test_state_load_validates_non_current_history(self) -> None:
+        first = self._start()
+        self._adt(
+            "complete",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(first),
+        )
+        self._start(host="claude")
+        state_path, state_value = self._stored_state()
+        state_value["tasks"][0]["snapshot"] = []
+        state_path.write_text(json.dumps(state_value))
+
+        error, _ = self._adt("list", expected_code=4)
+
+        self.assertEqual("state_corrupt", error["error"]["code"])
+
+    def test_empty_schema_v2_state_requires_a_null_current_task(self) -> None:
+        self._start()
+        state_path, state_value = self._stored_state()
+        state_value["revision"] = 0
+        state_value["tasks"] = []
+        state_value["current_task_id"] = None
+        state_path.write_text(json.dumps(state_value))
+
+        listed, _ = self._adt("list")
+
+        self.assertEqual([], listed["tasks"])
+        self.assertIsNone(listed["current_task_id"])
 
     def test_state_save_failure_reports_state_unavailable_without_path(self) -> None:
         runtime = self._load_runtime()
@@ -937,6 +1514,41 @@ class AdtCliTest(unittest.TestCase):
 
         resumed, _ = self._adt("resume", "--host", "claude")
         self.assertEqual("claude", resumed["task"]["lease"]["host"])
+
+    def test_handoff_rejects_blank_target_without_mutating_state(self) -> None:
+        started = self._start()
+        state_path, state_value = self._stored_state()
+        state_before = state_path.read_bytes()
+
+        for target in ("", " \n\t"):
+            with self.subTest(target=target):
+                error, _ = self._adt(
+                    "handoff",
+                    "--host",
+                    "codex",
+                    "--lease",
+                    self._lease(started),
+                    "--to",
+                    target,
+                    expected_code=3,
+                )
+                self.assertEqual("target_host_invalid", error["error"]["code"])
+                self.assertEqual(state_before, state_path.read_bytes())
+                self.assertEqual(
+                    state_value["revision"], self._stored_state()[1]["revision"]
+                )
+
+        handed_off, _ = self._adt(
+            "handoff",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+            "--to",
+            "  claude  ",
+        )
+        self.assertEqual("claude", handed_off["task"]["resume_host"])
+        self.assertEqual("claude", handed_off["checkpoint"]["target_host"])
 
     def test_resume_fails_closed_on_drift_until_explicitly_accepted(self) -> None:
         started = self._start()

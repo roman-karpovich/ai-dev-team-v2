@@ -30,6 +30,19 @@ STATE_UNAVAILABLE_MESSAGE = (
     "ADT needs read/write access to its state directory under the common Git "
     "directory."
 )
+TASK_KINDS = frozenset({"develop", "review"})
+TASK_PROFILES = frozenset({"economy", "balanced", "critical", "manual"})
+TASK_STATUSES = frozenset({"active", "paused", "completed"})
+CHECKPOINT_KINDS = frozenset(
+    {"manual", "pause", "handoff", "drift-accepted", "complete"}
+)
+LOWER_HEX = frozenset("0123456789abcdef")
+OCTAL_DIGITS = frozenset("01234567")
+FINGERPRINT_KINDS = frozenset({"file", "symlink", "special"})
+UNMERGED_STATUSES = frozenset({"DD", "AU", "UD", "UA", "DU", "AA", "UU"})
+INDEX_STATUSES = frozenset({"M", "T", "A", "R", "C"})
+WORKTREE_STATUSES = frozenset({"M", "T", "D", "R", "C"})
+INDEXED_WORKTREE_STATUSES = frozenset({" ", "M", "T", "D"})
 
 
 class CliError(Exception):
@@ -51,6 +64,379 @@ class CliError(Exception):
 class JsonArgumentParser(argparse.ArgumentParser):
     def error(self, message: str) -> NoReturn:
         raise CliError("usage", message, exit_code=2)
+
+
+def _nonblank(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _normalized_nonblank(value: Any) -> bool:
+    return _nonblank(value) and value == value.strip()
+
+
+def _string(value: Any) -> bool:
+    return isinstance(value, str)
+
+
+def _choice(value: Any, choices: frozenset[str]) -> bool:
+    return isinstance(value, str) and value in choices
+
+
+def _fixed_hex(value: Any, *, prefix: str = "", length: int) -> bool:
+    if not isinstance(value, str) or not value.startswith(prefix):
+        return False
+    suffix = value[len(prefix) :]
+    return len(suffix) == length and all(
+        character in LOWER_HEX for character in suffix
+    )
+
+
+def _valid_index_item(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    parts = value.split(" ")
+    if len(parts) != 3:
+        return False
+    mode, object_id, stage = parts
+    return (
+        len(mode) == 6
+        and all(character in OCTAL_DIGITS for character in mode)
+        and (
+            _fixed_hex(object_id, length=40)
+            or _fixed_hex(object_id, length=64)
+        )
+        and stage in {"0", "1", "2", "3"}
+    )
+
+
+def _valid_index(value: Any) -> bool:
+    return isinstance(value, list) and all(_valid_index_item(item) for item in value)
+
+
+def _valid_fingerprint(value: Any) -> bool:
+    if value is None:
+        return True
+    if not isinstance(value, dict):
+        return False
+    mode = value.get("mode")
+    size = value.get("size")
+    return (
+        isinstance(mode, str)
+        and mode.startswith("0o")
+        and len(mode) > 2
+        and all(character in OCTAL_DIGITS for character in mode[2:])
+        and isinstance(size, int)
+        and not isinstance(size, bool)
+        and size >= 0
+        and _choice(value.get("kind"), FINGERPRINT_KINDS)
+        and _fixed_hex(value.get("sha256"), length=64)
+    )
+
+
+def _valid_porcelain_v1_status(status: Any) -> bool:
+    """Validate XY pairs from the documented porcelain-v1 short-status table."""
+    if not isinstance(status, str) or len(status) != 2:
+        return False
+    if status in UNMERGED_STATUSES or status in {"??", "!!"}:
+        return True
+    index_status, worktree_status = status
+    if index_status == " ":
+        return worktree_status in WORKTREE_STATUSES | {"A"}
+    if index_status == "D":
+        return worktree_status == " "
+    return (
+        index_status in INDEX_STATUSES
+        and worktree_status in INDEXED_WORKTREE_STATUSES
+    )
+
+
+def _valid_change_entry(entry: Any) -> bool:
+    if not isinstance(entry, dict):
+        return False
+    if not {"status", "path", "index", "worktree"}.issubset(entry):
+        return False
+    status = entry.get("status")
+    if (
+        not _valid_porcelain_v1_status(status)
+        or not isinstance(entry.get("path"), str)
+        or not entry["path"]
+        or not _valid_index(entry.get("index"))
+        or not _valid_fingerprint(entry.get("worktree"))
+    ):
+        return False
+    original_fields = {"original_path", "original_index", "original_worktree"}
+    expects_original = "R" in status or "C" in status
+    present_original_fields = original_fields.intersection(entry)
+    if (
+        expects_original and present_original_fields != original_fields
+    ) or (not expects_original and present_original_fields):
+        return False
+    return not expects_original or (
+        isinstance(entry.get("original_path"), str)
+        and bool(entry["original_path"])
+        and _valid_index(entry.get("original_index"))
+        and _valid_fingerprint(entry.get("original_worktree"))
+    )
+
+
+def _valid_snapshot(snapshot: Any) -> bool:
+    if not isinstance(snapshot, dict):
+        return False
+    head = snapshot.get("head")
+    changes = snapshot.get("changes")
+    if not isinstance(changes, dict):
+        return False
+    total = changes.get("total")
+    entries = changes.get("entries")
+    truncated = changes.get("truncated")
+    return (
+        snapshot.get("format_version") == SNAPSHOT_FORMAT_VERSION
+        and not isinstance(snapshot.get("format_version"), bool)
+        and snapshot.get("algorithm") == "sha256"
+        and _fixed_hex(snapshot.get("digest"), prefix="sha256:", length=64)
+        and (
+            head is None
+            or _fixed_hex(head, length=40)
+            or _fixed_hex(head, length=64)
+        )
+        and isinstance(snapshot.get("dirty"), bool)
+        and isinstance(total, int)
+        and not isinstance(total, bool)
+        and total >= 0
+        and isinstance(entries, list)
+        and all(_valid_change_entry(entry) for entry in entries)
+        and isinstance(truncated, int)
+        and not isinstance(truncated, bool)
+        and truncated >= 0
+        and total == len(entries) + truncated
+        and snapshot["dirty"] == bool(total)
+    )
+
+
+def _valid_lease(lease: Any) -> bool:
+    return (
+        isinstance(lease, dict)
+        and _fixed_hex(lease.get("id"), prefix="lease_", length=32)
+        and _string(lease.get("host"))
+        and _string(lease.get("acquired_at"))
+    )
+
+
+def _valid_optional_string(value: dict[str, Any], key: str) -> bool:
+    return key not in value or _string(value[key])
+
+
+def _valid_checkpoint_kind_fields(checkpoint: dict[str, Any]) -> bool:
+    kind = checkpoint["kind"]
+    has_target = "target_host" in checkpoint
+    has_previous = "previous_digest" in checkpoint
+    if kind == "handoff":
+        return (
+            has_target
+            and _normalized_nonblank(checkpoint["target_host"])
+            and not has_previous
+        )
+    if kind == "drift-accepted":
+        return (
+            not has_target
+            and has_previous
+            and _fixed_hex(
+                checkpoint["previous_digest"],
+                prefix="sha256:",
+                length=64,
+            )
+        )
+    return not has_target and not has_previous
+
+
+def _valid_checkpoints(checkpoints: Any) -> bool:
+    if not isinstance(checkpoints, list):
+        return False
+    for expected_sequence, checkpoint in enumerate(checkpoints, start=1):
+        if not isinstance(checkpoint, dict):
+            return False
+        sequence = checkpoint.get("sequence")
+        if (
+            not _fixed_hex(checkpoint.get("id"), prefix="checkpoint_", length=32)
+            or isinstance(sequence, bool)
+            or sequence != expected_sequence
+            or not _choice(checkpoint.get("kind"), CHECKPOINT_KINDS)
+            or not _string(checkpoint.get("host"))
+            or not _string(checkpoint.get("created_at"))
+            or not _valid_snapshot(checkpoint.get("snapshot"))
+            or not _valid_optional_string(checkpoint, "note")
+            or not _valid_checkpoint_kind_fields(checkpoint)
+        ):
+            return False
+    return True
+
+
+def _valid_takeovers(takeovers: Any) -> bool:
+    if not isinstance(takeovers, list):
+        return False
+    return all(
+        isinstance(takeover, dict)
+        and _string(takeover.get("host"))
+        and _string(takeover.get("created_at"))
+        and _string(takeover.get("reason"))
+        for takeover in takeovers
+    )
+
+
+def _valid_task(task: Any) -> bool:
+    if not isinstance(task, dict):
+        return False
+    required_fields = {
+        "id",
+        "kind",
+        "profile",
+        "goal",
+        "status",
+        "lease",
+        "resume_host",
+        "snapshot",
+        "checkpoints",
+        "created_at",
+        "updated_at",
+    }
+    if not required_fields.issubset(task):
+        return False
+    status = task.get("status")
+    lease = task.get("lease")
+    resume_host = task.get("resume_host")
+    checkpoints = task.get("checkpoints")
+    if status == "active":
+        lifecycle_valid = _valid_lease(lease) and resume_host is None
+    elif status == "paused":
+        lifecycle_valid = lease is None and _normalized_nonblank(resume_host)
+    elif status == "completed":
+        lifecycle_valid = (
+            lease is None
+            and resume_host is None
+            and _string(task.get("completed_at"))
+        )
+    else:
+        lifecycle_valid = False
+    shape_valid = (
+        _fixed_hex(task.get("id"), prefix="task_", length=32)
+        and _choice(task.get("kind"), TASK_KINDS)
+        and _choice(task.get("profile"), TASK_PROFILES)
+        and _nonblank(task.get("goal"))
+        and _choice(status, TASK_STATUSES)
+        and lifecycle_valid
+        and _valid_snapshot(task.get("snapshot"))
+        and _valid_checkpoints(checkpoints)
+        and _valid_takeovers(task.get("takeovers", []))
+        and _string(task.get("created_at"))
+        and _string(task.get("updated_at"))
+        and _valid_optional_string(task, "completed_at")
+        and _valid_optional_string(task, "summary")
+    )
+    if not shape_valid:
+        return False
+    if checkpoints and task["snapshot"] != checkpoints[-1]["snapshot"]:
+        return False
+    if status == "paused":
+        if not checkpoints or checkpoints[-1]["kind"] not in {"pause", "handoff"}:
+            return False
+        terminal = checkpoints[-1]
+        expected_resume_host = (
+            terminal["host"]
+            if terminal["kind"] == "pause"
+            else terminal["target_host"]
+        )
+        if task["resume_host"] != expected_resume_host:
+            return False
+    completion_checkpoints = [
+        checkpoint for checkpoint in checkpoints if checkpoint["kind"] == "complete"
+    ]
+    if status != "completed":
+        return (
+            "completed_at" not in task
+            and "summary" not in task
+            and not completion_checkpoints
+        )
+    if len(completion_checkpoints) != 1 or checkpoints[-1]["kind"] != "complete":
+        return False
+    terminal = checkpoints[-1]
+    if task["completed_at"] != task["updated_at"] or task["completed_at"] != terminal[
+        "created_at"
+    ]:
+        return False
+    has_summary = "summary" in task
+    has_terminal_note = "note" in terminal
+    return has_summary == has_terminal_note and (
+        not has_summary or task["summary"] == terminal["note"]
+    )
+
+
+def _validate_state(value: dict[str, Any], workspace_id: str) -> None:
+    workspace_value = value.get("workspace")
+    if (
+        not isinstance(workspace_value, dict)
+        or not _fixed_hex(workspace_value.get("id"), length=24)
+        or not _string(workspace_value.get("root"))
+    ):
+        raise CliError(
+            "state_corrupt",
+            "The workspace state has no valid workspace identity.",
+            exit_code=4,
+        )
+    if workspace_value["id"] != workspace_id:
+        raise CliError(
+            "workspace_mismatch",
+            "The stored state belongs to a different workspace.",
+            exit_code=4,
+        )
+
+    tasks = value.get("tasks")
+    revision = value.get("revision")
+    current_id = value.get("current_task_id")
+    if (
+        not isinstance(tasks, list)
+        or isinstance(revision, bool)
+        or not isinstance(revision, int)
+        or revision < 0
+        or "current_task_id" not in value
+        or not _string(value.get("created_at"))
+        or not _string(value.get("updated_at"))
+    ):
+        raise CliError(
+            "state_corrupt",
+            "The workspace state has invalid task metadata.",
+            exit_code=4,
+        )
+    if not tasks:
+        if current_id is None and revision == 0:
+            return
+        raise CliError(
+            "state_corrupt",
+            "The workspace state has no valid current task.",
+            exit_code=4,
+        )
+
+    if not all(_valid_task(task) for task in tasks):
+        raise CliError(
+            "state_corrupt",
+            "The workspace state has invalid persisted task data.",
+            exit_code=4,
+        )
+    task_ids = [task["id"] for task in tasks]
+    minimum_revision = len(tasks) + sum(
+        len(task["checkpoints"]) + len(task.get("takeovers", [])) for task in tasks
+    )
+    if (
+        len(task_ids) != len(set(task_ids))
+        or revision < minimum_revision
+        or not _fixed_hex(current_id, prefix="task_", length=32)
+        or current_id != task_ids[-1]
+        or any(task["status"] != "completed" for task in tasks[:-1])
+    ):
+        raise CliError(
+            "state_corrupt",
+            "The workspace state has no valid current task.",
+            exit_code=4,
+        )
 
 
 @dataclass(frozen=True)
@@ -172,74 +558,7 @@ class StateStore:
                 details={"supported_schema_version": SCHEMA_VERSION},
                 exit_code=4,
             )
-        workspace_value = value.get("workspace")
-        if not isinstance(workspace_value, dict):
-            raise CliError(
-                "state_corrupt",
-                "The workspace state has no valid workspace identity.",
-                exit_code=4,
-            )
-        if workspace_value.get("id") != self.workspace.workspace_id:
-            raise CliError(
-                "workspace_mismatch",
-                "The stored state belongs to a different workspace.",
-                exit_code=4,
-            )
-        if not isinstance(value.get("tasks"), list):
-            raise CliError(
-                "state_corrupt",
-                "The workspace state has no valid task list.",
-                exit_code=4,
-            )
-        revision = value.get("revision")
-        if isinstance(revision, bool) or not isinstance(revision, int) or revision < 0:
-            raise CliError(
-                "state_corrupt",
-                "The workspace state has no valid revision.",
-                exit_code=4,
-            )
-        if "current_task_id" not in value:
-            raise CliError(
-                "state_corrupt",
-                "The workspace state has no valid current task.",
-                exit_code=4,
-            )
-        current_id = value["current_task_id"]
-        if current_id is None:
-            return value
-        if not isinstance(current_id, str) or not current_id:
-            raise CliError(
-                "state_corrupt",
-                "The workspace state has no valid current task.",
-                exit_code=4,
-            )
-        current_tasks = [
-            task
-            for task in value["tasks"]
-            if isinstance(task, dict) and task.get("id") == current_id
-        ]
-        if len(current_tasks) != 1:
-            raise CliError(
-                "state_corrupt",
-                "The workspace state has no valid current task.",
-                exit_code=4,
-            )
-        current_task = current_tasks[0]
-        snapshot = current_task.get("snapshot")
-        if (
-            not isinstance(snapshot, dict)
-            or not isinstance(snapshot.get("digest"), str)
-            or not isinstance(current_task.get("checkpoints"), list)
-            or (
-                "takeovers" in current_task
-                and not isinstance(current_task["takeovers"], list)
-            )
-        ):
-            raise CliError(
-                "state_corrupt",
-                "The workspace state has no valid current task data.",
-                exit_code=4,
-            )
+        _validate_state(value, self.workspace.workspace_id)
         return value
 
     def save(self, state_value: dict[str, Any]) -> None:
@@ -892,6 +1211,12 @@ def command_pause(
 def command_handoff(
     workspace: GitWorkspace, store: StateStore, arguments: argparse.Namespace
 ) -> dict[str, Any]:
+    target_host = arguments.to.strip()
+    if not target_host:
+        raise CliError(
+            "target_host_invalid",
+            "Target host must contain non-whitespace text.",
+        )
     with store.lock():
         state_value = _load_existing(store)
         task = _current_task(state_value)
@@ -905,11 +1230,11 @@ def command_handoff(
             timestamp=timestamp,
             snapshot=snapshot,
             note=arguments.note,
-            target_host=arguments.to,
+            target_host=target_host,
         )
         task["status"] = "paused"
         task["lease"] = None
-        task["resume_host"] = arguments.to
+        task["resume_host"] = target_host
         _commit_state(store, state_value, timestamp)
         return _success(
             "handoff",
