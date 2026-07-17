@@ -32,7 +32,7 @@ EXPECTED_REFERENCES = {
 REPOSITORY_BLOB_ROOT = (
     "https://github.com/roman-karpovich/ai-dev-team-v2/blob/master/"
 )
-EXPECTED_ADT_COMMANDS = {
+EXPECTED_TASK_STATE_COMMANDS = {
     tuple(shlex.split(command))
     for command in (
         'adt --workspace "$WORKSPACE" status',
@@ -184,14 +184,17 @@ class SkillContractTest(unittest.TestCase):
         _, review = frontmatter(SKILLS / "review/SKILL.md")
         self.assertEqual(EXPECTED_REVIEW_PREFLIGHTS, required_preflight_rows(review))
 
-    def test_lifecycle_reference_owns_exact_executable_command_surface(self) -> None:
+    def test_lifecycle_reference_owns_exact_canonical_task_state_forms(self) -> None:
         command_owners = {
             path.resolve()
             for path in PLUGIN.rglob("*.md")
             if fenced_adt_commands(read(path))
         }
         self.assertEqual({LIFECYCLE.resolve()}, command_owners)
-        self.assertEqual(EXPECTED_ADT_COMMANDS, fenced_adt_commands(read(LIFECYCLE)))
+        self.assertEqual(
+            EXPECTED_TASK_STATE_COMMANDS,
+            fenced_adt_commands(read(LIFECYCLE)),
+        )
 
     def test_homepage_and_all_repository_targets_exist(self) -> None:
         homepages = {

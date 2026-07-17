@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ast
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -42,6 +44,30 @@ class RepositoryContractTest(unittest.TestCase):
         entrypoint = (ROOT / "scripts/test-fast").read_text()
         self.assertNotIn("make test", entrypoint)
         self.assertNotIn("test-all", entrypoint)
+
+    def test_troubleshooting_error_codes_exist_in_adt_cli(self) -> None:
+        operations = (ROOT / "docs/mvp-operations.md").read_text()
+        troubleshooting_codes = {
+            token
+            for heading in re.findall(r"(?m)^### (.+)$", operations)
+            for token in re.findall(r"`([a-z][a-z0-9_]+)`", heading)
+            if "_" in token
+        }
+
+        source = ROOT / "plugins/ai-dev-team-v2/scripts/adt.py"
+        tree = ast.parse(source.read_text(), filename=str(source))
+        cli_error_codes = {
+            call.args[0].value
+            for call in ast.walk(tree)
+            if isinstance(call, ast.Call)
+            and isinstance(call.func, ast.Name)
+            and call.func.id == "CliError"
+            and call.args
+            and isinstance(call.args[0], ast.Constant)
+            and isinstance(call.args[0].value, str)
+        }
+
+        self.assertLessEqual(troubleshooting_codes, cli_error_codes)
 
     def test_host_plugin_versions_share_one_release_base(self) -> None:
         codex = json.loads(

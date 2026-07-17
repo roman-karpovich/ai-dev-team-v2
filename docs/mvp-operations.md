@@ -142,7 +142,7 @@ task. Complete the open task before starting another; do not delete its state.
 Return to the owning host or request an explicit handoff. Takeover cannot cross
 hosts.
 
-### `lease_mismatch`
+### `lease_conflict`
 
 Stop the stale session. Use the renewed lease from the latest checkpoint, or
 obtain approval for same-host takeover when the owning session is lost.

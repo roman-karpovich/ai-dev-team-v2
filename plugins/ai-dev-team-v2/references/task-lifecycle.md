@@ -35,7 +35,12 @@ than retain an active lease while waiting. Complete only when that task's
 closeout rules are satisfied. Completion closes workflow state; it is never a
 release recommendation or authorization.
 
-## Command forms
+## Canonical task-state command forms
+
+These are the canonical task-state forms used by the skills, not exhaustive CLI
+help. An optional `start --profile "$PROFILE"` records a durable label when the
+user selects one. The workspace-independent `review-gate` command is outside
+the task lifecycle and deliberately omitted here.
 
 Use JSON responses as the source of task and lease values:
 
