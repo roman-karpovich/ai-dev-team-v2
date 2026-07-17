@@ -78,6 +78,10 @@ def _string(value: Any) -> bool:
     return isinstance(value, str)
 
 
+def _integer(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
 def _choice(value: Any, choices: frozenset[str]) -> bool:
     return isinstance(value, str) and value in choices
 
@@ -125,8 +129,7 @@ def _valid_fingerprint(value: Any) -> bool:
         and mode.startswith("0o")
         and len(mode) > 2
         and all(character in OCTAL_DIGITS for character in mode[2:])
-        and isinstance(size, int)
-        and not isinstance(size, bool)
+        and _integer(size)
         and size >= 0
         and _choice(value.get("kind"), FINGERPRINT_KINDS)
         and _fixed_hex(value.get("sha256"), length=64)
@@ -190,8 +193,8 @@ def _valid_snapshot(snapshot: Any) -> bool:
     entries = changes.get("entries")
     truncated = changes.get("truncated")
     return (
-        snapshot.get("format_version") == SNAPSHOT_FORMAT_VERSION
-        and not isinstance(snapshot.get("format_version"), bool)
+        _integer(snapshot.get("format_version"))
+        and snapshot["format_version"] == SNAPSHOT_FORMAT_VERSION
         and snapshot.get("algorithm") == "sha256"
         and _fixed_hex(snapshot.get("digest"), prefix="sha256:", length=64)
         and (
@@ -200,13 +203,11 @@ def _valid_snapshot(snapshot: Any) -> bool:
             or _fixed_hex(head, length=64)
         )
         and isinstance(snapshot.get("dirty"), bool)
-        and isinstance(total, int)
-        and not isinstance(total, bool)
+        and _integer(total)
         and total >= 0
         and isinstance(entries, list)
         and all(_valid_change_entry(entry) for entry in entries)
-        and isinstance(truncated, int)
-        and not isinstance(truncated, bool)
+        and _integer(truncated)
         and truncated >= 0
         and total == len(entries) + truncated
         and snapshot["dirty"] == bool(total)
@@ -258,7 +259,7 @@ def _valid_checkpoints(checkpoints: Any) -> bool:
         sequence = checkpoint.get("sequence")
         if (
             not _fixed_hex(checkpoint.get("id"), prefix="checkpoint_", length=32)
-            or isinstance(sequence, bool)
+            or not _integer(sequence)
             or sequence != expected_sequence
             or not _choice(checkpoint.get("kind"), CHECKPOINT_KINDS)
             or not _string(checkpoint.get("host"))
@@ -308,7 +309,7 @@ def _valid_task(task: Any) -> bool:
     if status == "active":
         lifecycle_valid = _valid_lease(lease) and resume_host is None
     elif status == "paused":
-        lifecycle_valid = lease is None and _normalized_nonblank(resume_host)
+        lifecycle_valid = lease is None and _string(resume_host)
     elif status == "completed":
         lifecycle_valid = (
             lease is None
@@ -336,6 +337,25 @@ def _valid_task(task: Any) -> bool:
         return False
     if checkpoints and task["snapshot"] != checkpoints[-1]["snapshot"]:
         return False
+    for index, checkpoint in enumerate(checkpoints):
+        if checkpoint["kind"] != "drift-accepted":
+            continue
+        if index == 0:
+            return False
+        predecessor = checkpoints[index - 1]
+        if predecessor["kind"] not in {"pause", "handoff"}:
+            return False
+        expected_host = (
+            predecessor["host"]
+            if predecessor["kind"] == "pause"
+            else predecessor["target_host"]
+        )
+        if (
+            checkpoint["host"] != expected_host
+            or checkpoint["previous_digest"] != predecessor["snapshot"]["digest"]
+            or checkpoint["snapshot"]["digest"] == predecessor["snapshot"]["digest"]
+        ):
+            return False
     if status == "paused":
         if not checkpoints or checkpoints[-1]["kind"] not in {"pause", "handoff"}:
             return False
@@ -368,6 +388,22 @@ def _valid_task(task: Any) -> bool:
     return has_summary == has_terminal_note and (
         not has_summary or task["summary"] == terminal["note"]
     )
+
+
+def _inferred_resume_count(task: dict[str, Any]) -> int:
+    checkpoints = task["checkpoints"]
+    count = 0
+    for index, checkpoint in enumerate(checkpoints):
+        if checkpoint["kind"] not in {"pause", "handoff"}:
+            continue
+        has_successor = index + 1 < len(checkpoints)
+        was_resumed = has_successor or task["status"] != "paused"
+        successor_is_drift = (
+            has_successor and checkpoints[index + 1]["kind"] == "drift-accepted"
+        )
+        if was_resumed and not successor_is_drift:
+            count += 1
+    return count
 
 
 def _validate_state(value: dict[str, Any], workspace_id: str) -> None:
@@ -423,7 +459,10 @@ def _validate_state(value: dict[str, Any], workspace_id: str) -> None:
         )
     task_ids = [task["id"] for task in tasks]
     minimum_revision = len(tasks) + sum(
-        len(task["checkpoints"]) + len(task.get("takeovers", [])) for task in tasks
+        len(task["checkpoints"])
+        + len(task.get("takeovers", []))
+        + _inferred_resume_count(task)
+        for task in tasks
     )
     if (
         len(task_ids) != len(set(task_ids))
@@ -545,13 +584,25 @@ class StateStore:
                 STATE_UNAVAILABLE_MESSAGE,
                 exit_code=4,
             ) from error
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            ValueError,
+            RecursionError,
+        ) as error:
             raise CliError(
                 "state_corrupt",
                 "The workspace state cannot be read as valid JSON.",
                 exit_code=4,
             ) from error
-        if not isinstance(value, dict) or value.get("schema_version") != SCHEMA_VERSION:
+        schema_version = (
+            value.get("schema_version") if isinstance(value, dict) else None
+        )
+        if (
+            not isinstance(value, dict)
+            or not _integer(schema_version)
+            or schema_version != SCHEMA_VERSION
+        ):
             raise CliError(
                 "state_version_unsupported",
                 "The workspace state schema is not supported by this CLI.",
