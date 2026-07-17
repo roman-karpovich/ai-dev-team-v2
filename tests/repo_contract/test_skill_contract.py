@@ -110,9 +110,59 @@ EXPECTED_SKILL_ROUTES = {
         ),
     ],
 }
-MODEL_NAME = re.compile(
-    r"\b(?:opus|fable)\s+\d|\bclaude-(?:opus|fable)-[a-z0-9.-]+",
-    re.IGNORECASE,
+REQUIRED_SPECIALIST_BOUNDARIES = {
+    "incident-observability.md": {
+        (
+            "causal-reproduction",
+            "probe:adds-unverified-causal-precondition;safe-probe:unavailable-or-negative",
+            "establish-precondition-from:repository,deployment,incident-evidence",
+            "causality:unverified;develop:pause-unless-owner-revises-goal;review:withhold-affected-claim",
+        ),
+        (
+            "final-observer-evidence",
+            "claim:incident-outcome",
+            "compare:baseline,candidate@same-final-observer;measure:reachability,ordering,propagation-or-exit,exact-event-cardinality",
+            "claim:withhold",
+        ),
+    },
+    "verification-environments.md": {
+        (
+            "discriminating-seam",
+            "check:selected",
+            "record:proves,cannot-prove;claim:within-seam-only",
+            "outside-seam:unverified",
+        ),
+        (
+            "secret-safe-setup",
+            "required-environment:unavailable",
+            "forbid:secret-files,credentials,tokens,mutable-runtime-state@workspace,tool-output,logs,checkpoints,review-evidence;allow:checked-in-fixtures,dummy-values,secret-free-config",
+            "verification:blocked-if-no-safe-setup",
+        ),
+    },
+}
+MODEL_PLACEHOLDER = r"(?:unknown|string|null|none)"
+MODEL_LITERAL = rf"""
+    (?:
+        "(?!{MODEL_PLACEHOLDER}")[^"\n]+"
+        |'(?!{MODEL_PLACEHOLDER}')[^'\n]+'
+        |(?!{MODEL_PLACEHOLDER}\b)[a-z0-9][a-z0-9._/-]*
+    )
+"""
+MODEL_SELECTOR = re.compile(
+    rf"""
+    (?<![\w-])--model(?=$|[=\s])
+    |\bmodel(?:[-_ ]+(?:policy|selection|choice|routing))\b
+    |\b(?:choose|prefer|select|route|dispatch|fallback|switch|upgrade|downgrade)\w*
+       \s+(?:(?:a|an|the|default|preferred|selected|specific|configured)\s+){0,2}models?\b
+    |\b(?:default_|preferred_|selected_|fallback_)?model(?:_name|_id)?\s*=\s*{MODEL_LITERAL}
+    |["']model(?:_name|_id)?["']\]?\s*=\s*{MODEL_LITERAL}
+    |["']model(?:_name|_id)?["']\s*:\s*{MODEL_LITERAL}
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+DECLARATIVE_MODEL_SELECTOR = re.compile(
+    rf"^\s*model(?:_name|_id)?\s*:\s*{MODEL_LITERAL}",
+    re.IGNORECASE | re.MULTILINE | re.VERBOSE,
 )
 
 
@@ -166,30 +216,39 @@ def markdown_row(line: str) -> tuple[str, ...]:
     return tuple(normalized)
 
 
-def skill_route_rows(text: str) -> list[tuple[str, ...]]:
+def markdown_table_rows(text: str, header: str) -> list[tuple[str, ...]]:
     lines = text.splitlines()
-    header = "| Trigger | Resource | Boundary |"
     matches = [index for index, line in enumerate(lines) if line.strip() == header]
     if len(matches) != 1:
-        raise AssertionError("expected exactly one skill route table")
+        raise AssertionError(f"expected exactly one table: {header}")
 
     index = matches[0]
-    if index + 1 >= len(lines) or markdown_row(lines[index + 1]) != (
-        "---",
-        "---",
-        "---",
-    ):
-        raise AssertionError("malformed skill route table separator")
+    width = len(markdown_row(header))
+    if index + 1 >= len(lines) or markdown_row(lines[index + 1]) != ("---",) * width:
+        raise AssertionError(f"malformed table separator: {header}")
 
     rows: list[tuple[str, ...]] = []
     for line in lines[index + 2 :]:
         if not line.strip().startswith("|"):
             break
         row = markdown_row(line)
-        if len(row) != 3:
-            raise AssertionError(f"malformed skill route row: {line!r}")
+        if len(row) != width:
+            raise AssertionError(f"malformed table row: {line!r}")
         rows.append(row)
     return rows
+
+
+def skill_route_rows(text: str) -> list[tuple[str, ...]]:
+    return markdown_table_rows(text, "| Trigger | Resource | Boundary |")
+
+
+def policy_boundary_rows(text: str) -> set[tuple[str, ...]]:
+    rows = markdown_table_rows(text, "| Boundary | Trigger | Required | On unmet |")
+    if not all(all(row) for row in rows):
+        raise AssertionError("empty policy boundary cell")
+    if len({row[0] for row in rows}) != len(rows):
+        raise AssertionError("duplicate policy boundary id")
+    return set(rows)
 
 
 def installed_source_files() -> list[Path]:
@@ -198,17 +257,27 @@ def installed_source_files() -> list[Path]:
         for path in PLUGIN.rglob("*")
         if path.is_file()
         and (
-            path.suffix in {".md", ".yaml", ".json", ".py"}
+            path.suffix in {".md", ".yaml", ".yml", ".json", ".py"}
             or path.parent == PLUGIN / "bin"
         )
     ]
 
 
-def model_name_sources() -> set[Path]:
+def has_model_selector(path: Path, text: str) -> bool:
+    return bool(
+        MODEL_SELECTOR.search(text)
+        or (
+            path.suffix in {".yaml", ".yml"}
+            and DECLARATIVE_MODEL_SELECTOR.search(text)
+        )
+    )
+
+
+def model_selector_sources() -> set[Path]:
     return {
         path.resolve()
         for path in installed_source_files()
-        if MODEL_NAME.search(read(path))
+        if has_model_selector(path, read(path))
     }
 
 
@@ -254,6 +323,14 @@ class SkillContractTest(unittest.TestCase):
             with self.subTest(skill=name):
                 self.assertEqual(expected, skill_route_rows(body))
 
+    def test_specialist_references_retain_fail_closed_boundaries(self) -> None:
+        references = PLUGIN / "references"
+        for name, required in REQUIRED_SPECIALIST_BOUNDARIES.items():
+            with self.subTest(reference=name):
+                self.assertTrue(
+                    required.issubset(policy_boundary_rows(read(references / name)))
+                )
+
     def test_lifecycle_reference_owns_exact_canonical_task_state_forms(self) -> None:
         command_owners = {
             path.resolve()
@@ -293,9 +370,42 @@ class SkillContractTest(unittest.TestCase):
             }.issubset(resolved)
         )
 
-    def test_model_names_are_isolated_to_claude_runtime_reference(self) -> None:
+    def test_model_selection_is_isolated_to_claude_runtime_reference(self) -> None:
         allowed = (PLUGIN / "references/claude-runtime.md").resolve()
-        self.assertEqual({allowed}, model_name_sources())
+        self.assertEqual({allowed}, model_selector_sources())
+
+    def test_model_selector_is_family_agnostic_without_identity_false_positives(
+        self,
+    ) -> None:
+        for path, policy in (
+            (Path("policy.md"), "claude --model nebula"),
+            (Path("policy.md"), "Runtime model policy: prefer nebula."),
+            (Path("runtime.py"), 'MODEL = "nebula"'),
+            (Path("runtime.py"), 'MODEL_ID = "nebula"'),
+            (Path("runtime.py"), 'DEFAULT_MODEL = "nebula"'),
+            (Path("runtime.py"), 'runner(model="nebula")'),
+            (Path("runtime.py"), 'runner(model_id="nebula")'),
+            (Path("agent.yaml"), "model: nebula"),
+            (Path("agent.yaml"), "model_id: nebula"),
+            (Path("config.json"), '{"model":"nebula"}'),
+            (Path("config.json"), '{"model_id":"nebula"}'),
+            (Path("runtime.py"), 'config["model"]="nebula"'),
+        ):
+            with self.subTest(policy=policy):
+                self.assertTrue(has_model_selector(path, policy))
+
+        for path, evidence in (
+            (Path("review.md"), "two-model review"),
+            (Path("review.md"), "model evidence"),
+            (Path("review.md"), "model diversity"),
+            (Path("receipt.py"), 'receipt["identity"]["model"]'),
+            (Path("notes.md"), "claude-code-2 migration notes"),
+            (Path("schema.json"), '{"model":"string"}'),
+            (Path("receipt.py"), 'identity_model = "unknown"'),
+            (Path("receipt.py"), "def record(model: str) -> None: pass"),
+        ):
+            with self.subTest(evidence=evidence):
+                self.assertFalse(has_model_selector(path, evidence))
 
 
 if __name__ == "__main__":

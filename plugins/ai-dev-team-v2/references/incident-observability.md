@@ -4,6 +4,13 @@ Load this reference only when the claimed outcome actually depends on
 automatic reporting, framework or process lifecycle, termination or
 propagation, bootstrap, or event cardinality. Do not apply it to every bug.
 
+## Required outcomes
+
+| Boundary | Trigger | Required | On unmet |
+| --- | --- | --- | --- |
+| `causal-reproduction` | `probe:adds-unverified-causal-precondition;safe-probe:unavailable-or-negative` | `establish-precondition-from:repository,deployment,incident-evidence` | `causality:unverified;develop:pause-unless-owner-revises-goal;review:withhold-affected-claim` |
+| `final-observer-evidence` | `claim:incident-outcome` | `compare:baseline,candidate@same-final-observer;measure:reachability,ordering,propagation-or-exit,exact-event-cardinality` | `claim:withhold` |
+
 ## Qualify the baseline
 
 Identify the final production-relevant observer and the measurable outcome.
