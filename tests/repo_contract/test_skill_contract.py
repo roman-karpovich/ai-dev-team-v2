@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 import re
 import shlex
@@ -140,28 +141,26 @@ REQUIRED_SPECIALIST_BOUNDARIES = {
         ),
     },
 }
-MODEL_PLACEHOLDER = r"(?:unknown|string|null|none)"
-MODEL_LITERAL = rf"""
-    (?:
-        "(?!{MODEL_PLACEHOLDER}")[^"\n]+"
-        |'(?!{MODEL_PLACEHOLDER}')[^'\n]+'
-        |(?!{MODEL_PLACEHOLDER}\b)[a-z0-9][a-z0-9._/-]*
-    )
-"""
-MODEL_SELECTOR = re.compile(
-    rf"""
-    (?<![\w-])--model(?=$|[=\s])
+MODEL_FIELD = r"model(?:_name|_id)?"
+MODEL_KEY = rf"(?:(?:default|preferred|selected|fallback)_)?{MODEL_FIELD}"
+MODEL_PLACEHOLDERS = frozenset({"unknown", "string", "null", "none"})
+MODEL_POLICY_SIGNAL = re.compile(
+    r"""
+    (?<![\w-])--model(?![\w-])
     |\bmodel(?:[-_ ]+(?:policy|selection|choice|routing))\b
     |\b(?:choose|prefer|select|route|dispatch|fallback|switch|upgrade|downgrade)\w*
        \s+(?:(?:a|an|the|default|preferred|selected|specific|configured)\s+){0,2}models?\b
-    |\b(?:default_|preferred_|selected_|fallback_)?model(?:_name|_id)?\s*=\s*{MODEL_LITERAL}
-    |["']model(?:_name|_id)?["']\]?\s*=\s*{MODEL_LITERAL}
-    |["']model(?:_name|_id)?["']\s*:\s*{MODEL_LITERAL}
     """,
     re.IGNORECASE | re.VERBOSE,
 )
-DECLARATIVE_MODEL_SELECTOR = re.compile(
-    rf"^\s*model(?:_name|_id)?\s*:\s*{MODEL_LITERAL}",
+MODEL_CONTROL = re.compile(
+    rf"""
+    (?:(?<![\w-]){MODEL_KEY}(?![\w-])|["']{MODEL_KEY}["']\s*\]?)
+    \s*=(?![ \t]*["']?(?:unknown|string|null|none)["']?[ \t]*(?:[,;)}}\]]|$))
+    [ \t]*\S
+    |(?<![\w-])(?:["']{MODEL_KEY}["']|{MODEL_KEY})(?![\w-])\s*:
+    (?![ \t]*["']?(?:unknown|string|null|none)["']?[ \t]*(?:[,}}\]#]|$))
+    """,
     re.IGNORECASE | re.MULTILINE | re.VERBOSE,
 )
 
@@ -251,6 +250,98 @@ def policy_boundary_rows(text: str) -> set[tuple[str, ...]]:
     return set(rows)
 
 
+def model_key(value: object) -> bool:
+    return isinstance(value, str) and re.fullmatch(
+        MODEL_KEY, value.replace("-", "_"), re.IGNORECASE
+    ) is not None
+
+
+def ast_target_keys(node: ast.AST) -> list[str]:
+    if isinstance(node, ast.Name):
+        return [node.id]
+    if isinstance(node, ast.Attribute):
+        return [node.attr]
+    if isinstance(node, ast.Subscript):
+        key = node.slice
+        if isinstance(key, ast.Constant) and isinstance(key.value, str):
+            return [key.value]
+    if isinstance(node, (ast.List, ast.Tuple)):
+        return [key for item in node.elts for key in ast_target_keys(item)]
+    return []
+
+
+def ast_value_selects_model(node: ast.AST) -> bool:
+    if isinstance(node, ast.Constant):
+        if node.value is None:
+            return False
+        if isinstance(node.value, str):
+            return node.value.strip().casefold() not in MODEL_PLACEHOLDERS
+    if isinstance(node, ast.Name):
+        return node.id.casefold() not in MODEL_PLACEHOLDERS
+    return True
+
+
+def python_has_model_selector(text: str) -> bool:
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return bool(MODEL_POLICY_SIGNAL.search(text) or MODEL_CONTROL.search(text))
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if MODEL_POLICY_SIGNAL.search(node.value):
+                return True
+        elif isinstance(node, (ast.Assign, ast.AnnAssign, ast.NamedExpr)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            value = node.value
+            if value is not None and ast_value_selects_model(value):
+                if any(
+                    model_key(key)
+                    for target in targets
+                    for key in ast_target_keys(target)
+                ):
+                    return True
+        elif isinstance(node, ast.AugAssign):
+            if any(model_key(key) for key in ast_target_keys(node.target)):
+                return True
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+            positional = [*node.args.posonlyargs, *node.args.args]
+            defaults = zip(positional[-len(node.args.defaults) :], node.args.defaults)
+            keyword_defaults = zip(node.args.kwonlyargs, node.args.kw_defaults)
+            if any(
+                model_key(argument.arg)
+                and default is not None
+                and ast_value_selects_model(default)
+                for argument, default in (*defaults, *keyword_defaults)
+            ):
+                return True
+        elif isinstance(node, ast.Call):
+            if (
+                isinstance(node.func, ast.Name)
+                and node.func.id == "setattr"
+                and len(node.args) >= 3
+                and isinstance(node.args[1], ast.Constant)
+                and model_key(node.args[1].value)
+                and ast_value_selects_model(node.args[2])
+            ):
+                return True
+            if any(
+                model_key(keyword.arg) and ast_value_selects_model(keyword.value)
+                for keyword in node.keywords
+                if keyword.arg is not None
+            ):
+                return True
+        elif isinstance(node, ast.Dict):
+            for key, value in zip(node.keys, node.values, strict=True):
+                if (
+                    isinstance(key, ast.Constant)
+                    and model_key(key.value)
+                    and ast_value_selects_model(value)
+                ):
+                    return True
+    return False
+
+
 def installed_source_files() -> list[Path]:
     return [
         path
@@ -258,19 +349,20 @@ def installed_source_files() -> list[Path]:
         if path.is_file()
         and (
             path.suffix in {".md", ".yaml", ".yml", ".json", ".py"}
-            or path.parent == PLUGIN / "bin"
+            or path.is_relative_to(PLUGIN / "bin")
         )
     ]
 
 
 def has_model_selector(path: Path, text: str) -> bool:
-    return bool(
-        MODEL_SELECTOR.search(text)
-        or (
-            path.suffix in {".yaml", ".yml"}
-            and DECLARATIVE_MODEL_SELECTOR.search(text)
-        )
-    )
+    if path.suffix == ".py":
+        return python_has_model_selector(text)
+    if path.suffix == ".json":
+        try:
+            text = json.dumps(json.loads(text), separators=(",", ":"))
+        except json.JSONDecodeError:
+            pass
+    return bool(MODEL_POLICY_SIGNAL.search(text) or MODEL_CONTROL.search(text))
 
 
 def model_selector_sources() -> set[Path]:
@@ -374,26 +466,42 @@ class SkillContractTest(unittest.TestCase):
         allowed = (PLUGIN / "references/claude-runtime.md").resolve()
         self.assertEqual({allowed}, model_selector_sources())
 
-    def test_model_selector_is_family_agnostic_without_identity_false_positives(
-        self,
-    ) -> None:
+    def test_model_selector_sinks_are_family_agnostic_and_fail_closed(self) -> None:
         for path, policy in (
             (Path("policy.md"), "claude --model nebula"),
             (Path("policy.md"), "Runtime model policy: prefer nebula."),
+            (Path("policy.md"), "Choose a model."),
+            (Path("policy.md"), "Prefer the configured model."),
+            (Path("policy.md"), "Route models by task."),
+            (Path("policy.md"), "Select model."),
             (Path("runtime.py"), 'MODEL = "nebula"'),
             (Path("runtime.py"), 'MODEL_ID = "nebula"'),
             (Path("runtime.py"), 'DEFAULT_MODEL = "nebula"'),
             (Path("runtime.py"), 'runner(model="nebula")'),
             (Path("runtime.py"), 'runner(model_id="nebula")'),
+            (Path("runtime.py"), "runner(model=resolve_model())"),
+            (Path("runtime.py"), 'model: Literal["nebula"] = "nebula"'),
+            (Path("runtime.py"), 'identity = dict(model="nebula")'),
+            (Path("runtime.py"), 'def launch(model="nebula"): pass'),
+            (Path("runtime.py"), 'def launch(*, model="nebula"): pass'),
+            (Path("runtime.py"), 'launch = lambda model="nebula": None'),
+            (Path("runtime.py"), 'setattr(config, "model", "nebula")'),
+            (Path("runtime.py"), "model, runtime = resolve_identity()"),
+            (Path("runtime.py"), 'model += "-fallback"'),
             (Path("agent.yaml"), "model: nebula"),
             (Path("agent.yaml"), "model_id: nebula"),
+            (Path("agent.yaml"), "model:\n  id: nebula"),
             (Path("config.json"), '{"model":"nebula"}'),
             (Path("config.json"), '{"model_id":"nebula"}'),
+            (Path("config.json"), '{"model":{"id":"nebula"}}'),
+            (Path("receipt.json"), '{"identity":{"model":"nebula"}}'),
             (Path("runtime.py"), 'config["model"]="nebula"'),
+            (Path("bin/nested/launcher"), "args=(--model nebula)"),
         ):
             with self.subTest(policy=policy):
                 self.assertTrue(has_model_selector(path, policy))
 
+    def test_existing_identity_schema_reads_are_not_model_selectors(self) -> None:
         for path, evidence in (
             (Path("review.md"), "two-model review"),
             (Path("review.md"), "model evidence"),
@@ -403,6 +511,22 @@ class SkillContractTest(unittest.TestCase):
             (Path("schema.json"), '{"model":"string"}'),
             (Path("receipt.py"), 'identity_model = "unknown"'),
             (Path("receipt.py"), "def record(model: str) -> None: pass"),
+            (
+                Path("receipt.py"),
+                'fields = {"provider", "runtime", "model"}',
+            ),
+            (
+                Path("receipt.py"),
+                'receipt["identity"]["model"]',
+            ),
+            (
+                Path("receipt.py"),
+                'for field in ("provider", "runtime", "model"): pass',
+            ),
+            (Path("runtime.py"), 'def launch(model="unknown"): pass'),
+            (Path("runtime.py"), "def launch(*, model_id=None): pass"),
+            (Path("runtime.py"), 'setattr(config, "model", "unknown")'),
+            (Path("runtime.py"), 'parser.add_argument("--model-cache")'),
         ):
             with self.subTest(evidence=evidence):
                 self.assertFalse(has_model_selector(path, evidence))
