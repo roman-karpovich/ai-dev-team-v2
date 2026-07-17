@@ -3,6 +3,13 @@
 Load this reference only when a required check needs an unavailable dependency,
 runtime, production bootstrap, or load-bearing environment equivalence.
 
+## Required outcomes
+
+| Boundary | Trigger | Required | On unmet |
+| --- | --- | --- | --- |
+| `discriminating-seam` | `check:selected` | `record:proves,cannot-prove;claim:within-seam-only` | `outside-seam:unverified` |
+| `secret-safe-setup` | `required-environment:unavailable` | `forbid:secret-files,credentials,tokens,mutable-runtime-state@workspace,tool-output,logs,checkpoints,review-evidence;allow:checked-in-fixtures,dummy-values,secret-free-config` | `verification:blocked-if-no-safe-setup` |
+
 ## Select a discriminating seam
 
 Start with the smallest ready offline check that can distinguish the accepted
