@@ -41,6 +41,7 @@ Use JSON responses as the source of task and lease values:
 
 ```text
 adt --workspace "$WORKSPACE" status
+adt --workspace "$WORKSPACE" list
 adt --workspace "$WORKSPACE" start --host "$HOST" --kind develop --goal "$GOAL"
 adt --workspace "$WORKSPACE" start --host "$HOST" --kind review --goal "$GOAL"
 adt --workspace "$WORKSPACE" resume --host "$HOST"

@@ -36,6 +36,7 @@ EXPECTED_ADT_COMMANDS = {
     tuple(shlex.split(command))
     for command in (
         'adt --workspace "$WORKSPACE" status',
+        'adt --workspace "$WORKSPACE" list',
         'adt --workspace "$WORKSPACE" start --host "$HOST" --kind develop --goal "$GOAL"',
         'adt --workspace "$WORKSPACE" start --host "$HOST" --kind review --goal "$GOAL"',
         'adt --workspace "$WORKSPACE" resume --host "$HOST"',
@@ -48,6 +49,23 @@ EXPECTED_ADT_COMMANDS = {
         'adt --workspace "$WORKSPACE" complete --host "$HOST" --lease "$LEASE" --summary "$SUMMARY"',
     )
 }
+EXPECTED_REVIEW_PREFLIGHTS = [
+    (
+        "request:cold|independent|two-model",
+        "references/cold-independent-review.md",
+        "before:artifact-inspection|repository-context|adt-state",
+    ),
+    (
+        "host:claude",
+        "references/claude-runtime.md",
+        "after:cold-if-triggered;before:repository-exposure|adt-state|artifact-inspection",
+    ),
+    (
+        "always",
+        "references/task-lifecycle.md",
+        "after:prior-preflights;before:adt-state|mutation",
+    ),
+]
 
 
 def read(path: Path) -> str:
@@ -89,6 +107,43 @@ def fenced_adt_commands(text: str) -> set[tuple[str, ...]]:
     }
 
 
+def markdown_row(line: str) -> tuple[str, ...]:
+    cells = re.split(r"(?<!\\)\|", line.strip().strip("|"))
+    normalized: list[str] = []
+    for cell in cells:
+        value = cell.strip().replace(r"\|", "|")
+        if len(value) >= 2 and value.startswith("`") and value.endswith("`"):
+            value = value[1:-1]
+        normalized.append(value)
+    return tuple(normalized)
+
+
+def required_preflight_rows(text: str) -> list[tuple[str, ...]]:
+    lines = text.splitlines()
+    header = "| Trigger | Resource | Boundary |"
+    matches = [index for index, line in enumerate(lines) if line.strip() == header]
+    if len(matches) != 1:
+        raise AssertionError("expected exactly one required preflight table")
+
+    index = matches[0]
+    if index + 1 >= len(lines) or markdown_row(lines[index + 1]) != (
+        "---",
+        "---",
+        "---",
+    ):
+        raise AssertionError("malformed required preflight table separator")
+
+    rows: list[tuple[str, ...]] = []
+    for line in lines[index + 2 :]:
+        if not line.strip().startswith("|"):
+            break
+        row = markdown_row(line)
+        if len(row) != 3:
+            raise AssertionError(f"malformed required preflight row: {line!r}")
+        rows.append(row)
+    return rows
+
+
 def repository_link_target(base: Path, target: str) -> Path | None:
     if target.startswith(REPOSITORY_BLOB_ROOT):
         return (ROOT / unquote(target.removeprefix(REPOSITORY_BLOB_ROOT))).resolve()
@@ -125,13 +180,9 @@ class SkillContractTest(unittest.TestCase):
                 self.assertTrue(resolved.is_relative_to(PLUGIN.resolve()), locator)
                 self.assertTrue(resolved.is_file(), locator)
 
-    def test_review_preflight_resource_order_is_fail_closed(self) -> None:
+    def test_review_preflight_table_is_exact_and_ordered(self) -> None:
         _, review = frontmatter(SKILLS / "review/SKILL.md")
-        cold = review.index("`references/cold-independent-review.md`")
-        claude = review.index("`references/claude-runtime.md`")
-        lifecycle = review.index("`references/task-lifecycle.md`")
-        self.assertLess(cold, claude)
-        self.assertLess(claude, lifecycle)
+        self.assertEqual(EXPECTED_REVIEW_PREFLIGHTS, required_preflight_rows(review))
 
     def test_lifecycle_reference_owns_exact_executable_command_surface(self) -> None:
         command_owners = {

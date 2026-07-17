@@ -14,12 +14,17 @@ All `references/...` locators below resolve from the installed plugin root.
 
 ## Load preflights before state
 
-- When the user requests a cold, independent, or two-model review, first read
-  `references/cold-independent-review.md` and complete its preflight before
-  artifact inspection, repository context, or ADT state.
-- When `HOST=claude`, next read `references/claude-runtime.md` before repository
-  exposure, ADT state, or artifact inspection.
-- Then read `references/task-lifecycle.md` before ADT state or mutation.
+| Trigger | Resource | Boundary |
+| --- | --- | --- |
+| `request:cold\|independent\|two-model` | `references/cold-independent-review.md` | `before:artifact-inspection\|repository-context\|adt-state` |
+| `host:claude` | `references/claude-runtime.md` | `after:cold-if-triggered;before:repository-exposure\|adt-state\|artifact-inspection` |
+| `always` | `references/task-lifecycle.md` | `after:prior-preflights;before:adt-state\|mutation` |
+
+`|` joins alternatives or boundary members; `;` sequences boundaries from
+left to right.
+
+Load optional specialist routes only when their trigger applies:
+
 - When a reviewed claim actually depends on automatic reporting, framework or
   process lifecycle, termination or propagation, bootstrap, or event
   cardinality, read `references/incident-observability.md` before inspecting
