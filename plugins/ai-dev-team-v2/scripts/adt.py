@@ -172,7 +172,14 @@ class StateStore:
                 details={"supported_schema_version": SCHEMA_VERSION},
                 exit_code=4,
             )
-        if value.get("workspace", {}).get("id") != self.workspace.workspace_id:
+        workspace_value = value.get("workspace")
+        if not isinstance(workspace_value, dict):
+            raise CliError(
+                "state_corrupt",
+                "The workspace state has no valid workspace identity.",
+                exit_code=4,
+            )
+        if workspace_value.get("id") != self.workspace.workspace_id:
             raise CliError(
                 "workspace_mismatch",
                 "The stored state belongs to a different workspace.",
@@ -182,6 +189,55 @@ class StateStore:
             raise CliError(
                 "state_corrupt",
                 "The workspace state has no valid task list.",
+                exit_code=4,
+            )
+        revision = value.get("revision")
+        if isinstance(revision, bool) or not isinstance(revision, int) or revision < 0:
+            raise CliError(
+                "state_corrupt",
+                "The workspace state has no valid revision.",
+                exit_code=4,
+            )
+        if "current_task_id" not in value:
+            raise CliError(
+                "state_corrupt",
+                "The workspace state has no valid current task.",
+                exit_code=4,
+            )
+        current_id = value["current_task_id"]
+        if current_id is None:
+            return value
+        if not isinstance(current_id, str) or not current_id:
+            raise CliError(
+                "state_corrupt",
+                "The workspace state has no valid current task.",
+                exit_code=4,
+            )
+        current_tasks = [
+            task
+            for task in value["tasks"]
+            if isinstance(task, dict) and task.get("id") == current_id
+        ]
+        if len(current_tasks) != 1:
+            raise CliError(
+                "state_corrupt",
+                "The workspace state has no valid current task.",
+                exit_code=4,
+            )
+        current_task = current_tasks[0]
+        snapshot = current_task.get("snapshot")
+        if (
+            not isinstance(snapshot, dict)
+            or not isinstance(snapshot.get("digest"), str)
+            or not isinstance(current_task.get("checkpoints"), list)
+            or (
+                "takeovers" in current_task
+                and not isinstance(current_task["takeovers"], list)
+            )
+        ):
+            raise CliError(
+                "state_corrupt",
+                "The workspace state has no valid current task data.",
                 exit_code=4,
             )
         return value
@@ -523,6 +579,8 @@ def _new_state(workspace: GitWorkspace, timestamp: str) -> dict[str, Any]:
 
 def _current_task(state_value: dict[str, Any]) -> dict[str, Any]:
     current_id = state_value.get("current_task_id")
+    if current_id is None:
+        raise CliError("no_task", "No current task exists in this workspace.")
     for task in state_value["tasks"]:
         if isinstance(task, dict) and task.get("id") == current_id:
             return task
