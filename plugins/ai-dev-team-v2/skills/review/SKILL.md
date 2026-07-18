@@ -41,6 +41,8 @@ left to right.
    severities, proposed fixes, and expected conclusions.
 4. For each counted cold path, use a distinct checkout, fresh inference
    context, standalone path-specific `kind=review` state, and sealed output.
+   Quiesce the launcher lane first and run counted paths one at a time as the
+   cold-review reference requires.
    Never hand off between cold paths, resume another path's state, or read its
    context. Keep every path's findings hidden until all counted paths have
    fixed their results; adjudicate only then.

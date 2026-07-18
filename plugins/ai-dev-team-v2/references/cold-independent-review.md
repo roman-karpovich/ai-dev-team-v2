@@ -36,6 +36,20 @@ that the result is non-independent.
 
 ## Isolate the path
 
+Make the launcher lane quiescent before starting a counted path. Here,
+`other-child-agents` means every development or review child other than the
+launcher and the one reviewer about to start.
+
+| Boundary | Trigger | Required | On unmet |
+| --- | --- | --- | --- |
+| `quiescent-counted-path` | `before:counted-cold-launch` | `other-child-agents:terminal;counted-reviewers:one-at-a-time;reviewer-handle:hidden-from-other-agents` | `launch:defer` |
+| `sealed-conclusion-embargo` | `from:launch;until:conclusion-sealed` | `forbid:spawn-agent,send-message,follow-up,interrupt;wait:terminal-result` | `path:independence-compromised;conclusion:do-not-count` |
+| `unsolicited-cross-agent-contact` | `message:cross-agent-unsolicited` | `stop:review` | `path:independence-compromised;conclusion:do-not-count` |
+
+The launcher may remain active only to wait for and receive the terminal result.
+If the host cannot prevent an unsolicited child-to-reviewer message with this
+lane quiescent, do not count that path as independent.
+
 - Give every counted cold path a distinct review checkout exposing the accepted
   immutable `BASE..HEAD`, a fresh inference context, standalone path-specific
   `kind=review` state, and its own sealed output.
