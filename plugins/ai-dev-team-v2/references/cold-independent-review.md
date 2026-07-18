@@ -13,6 +13,14 @@ checks. Prior findings, suspected locations, severities, proposed fixes,
 expected conclusions, builder transcripts, imported summaries, and
 finding-bearing memory contaminate a cold path.
 
+Inference-visible context includes shared coordination surfaces, even when the
+session itself started empty. Before and during a counted cold path, do not
+inspect agent, task, or thread registries, teammate status feeds, messages,
+transcripts, summaries, or another path's progress. A read-only registry can
+still disclose prior findings or suspected locations. The launcher should
+withhold those tools where possible and otherwise state this prohibition in
+the neutral work order.
+
 If contaminated, stop as `independence-compromised`. Telling the model to
 ignore known findings cannot restore independence. Start a fresh one-off
 memory-clean session before any artifact or state exposure:
