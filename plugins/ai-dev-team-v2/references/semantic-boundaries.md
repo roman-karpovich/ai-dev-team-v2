@@ -17,6 +17,11 @@ ask one focused owner decision before adding defensive behavior. A review
 finding must identify a reachable trigger inside the accepted domain or a
 contradicted boundary.
 
+For a counted cold path, the cold-review contact boundary overrides this
+owner-decision route. Record unresolved domain membership as a terminal gap or
+`HOLD` without contacting the owner or launcher. Outside a counted cold path,
+the ordinary owner-decision route above still applies.
+
 ## Upstream replacement
 
 When local logic replaces an upstream value, establish semantic equivalence

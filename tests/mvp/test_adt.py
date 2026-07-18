@@ -4,6 +4,7 @@ import copy
 import fcntl
 import importlib.util
 import json
+import os
 import stat
 import subprocess
 import sys
@@ -185,19 +186,23 @@ class AdtCliTest(unittest.TestCase):
             check=False,
             text=True,
             capture_output=True,
+            env={**os.environ, "COLUMNS": "60"},
         )
 
         self.assertEqual(0, result.returncode, result.stderr)
         help_text = " ".join(result.stdout.lower().split())
         self.assertIn("launcher-only", help_text)
         self.assertIn("not an individual review path", help_text)
-        self.assertIn("at least two sealed paths", help_text)
+        self.assertIn("at least two paths are sealed", help_text)
         self.assertIn("does not launch a reviewer", help_text)
         self.assertIn("adt.portable-cold-review-bundle.v0", help_text)
         self.assertIn("bundle.json", help_text)
-        self.assertIn("work_order", help_text)
-        self.assertIn("paths", help_text)
+        self.assertIn(
+            "bundle.json exact top-level fields: contract_version work_order paths",
+            help_text,
+        )
         self.assertIn("--bundle directory", help_text)
+        self.assertLessEqual(max(map(len, result.stdout.splitlines())), 60)
 
     def test_start_rejects_blank_goal_without_creating_state(self) -> None:
         for goal in ("", " \n\t"):
