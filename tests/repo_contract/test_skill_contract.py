@@ -512,6 +512,9 @@ class SkillContractTest(unittest.TestCase):
         _, review_skill = frontmatter(SKILLS / "review" / "SKILL.md")
         review_skill = " ".join(review_skill.split())
         lifecycle = " ".join(read(LIFECYCLE).split())
+        semantic = " ".join(
+            read(PLUGIN / "references/semantic-boundaries.md").split()
+        )
 
         self.assertIn(
             "A counted reviewer uses the normal standalone `kind=review` task "
@@ -536,14 +539,30 @@ class SkillContractTest(unittest.TestCase):
             review_skill,
         )
         self.assertIn(
-            "Record a missing normative input as a terminal gap or `HOLD`; "
-            "never ask the launcher, root, owner, or another agent for it.",
+            "In a counted cold path, record a missing normative input as a "
+            "terminal gap or `HOLD`; never ask the launcher, root, owner, or "
+            "another agent for it.",
+            review_skill,
+        )
+        self.assertIn(
+            "Outside a counted cold path, follow the ordinary owner-decision "
+            "route.",
             review_skill,
         )
         self.assertIn(
             "`review-gate` is a launcher/composer command used only after at "
             "least two paths are sealed.",
             lifecycle,
+        )
+        self.assertIn(
+            "For a counted cold path, the cold-review contact boundary "
+            "overrides this owner-decision route.",
+            semantic,
+        )
+        self.assertIn(
+            "Record unresolved domain membership as a terminal gap or `HOLD` "
+            "without contacting the owner or launcher.",
+            semantic,
         )
 
     def test_outbound_contact_self_aborts_without_waiting_for_a_reply(self) -> None:

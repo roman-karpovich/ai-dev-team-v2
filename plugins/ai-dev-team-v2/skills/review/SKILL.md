@@ -72,8 +72,9 @@ later work there is repair validation, never a fresh cold path. Preserve
   evidence, the violated accepted claim or repository constraint, and the
   reachable in-domain consequence. Distinguish blockers, non-blocking
   observations, and open questions. If none survive, state residual gaps.
-- Record a missing normative input as a terminal gap or `HOLD`; never ask the
-  launcher, root, owner, or another agent for it.
+- In a counted cold path, record a missing normative input as a terminal gap or
+  `HOLD`; never ask the launcher, root, owner, or another agent for it. Outside
+  a counted cold path, follow the ordinary owner-decision route.
 - Checkpoint neutral evidence and conclusions only within the current lineage.
   Keep a cold path's output sealed until the cross-path embargo ends.
 

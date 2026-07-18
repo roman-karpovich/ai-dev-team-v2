@@ -1501,17 +1501,21 @@ def build_parser() -> JsonArgumentParser:
         help="Launcher-only gate for completed portable cold-review evidence.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=(
-            "Launcher-only aggregator for a portable cold-review bundle after "
-            "at least two sealed paths. This is not an individual review path; "
-            "individual reviewers use the standalone task lifecycle with "
-            "start --kind review. It does not launch a reviewer."
+            "Launcher-only portable cold-review bundle aggregator.\n"
+            "Use only after at least two paths are sealed.\n"
+            "This is not an individual review path and does not\n"
+            "launch a reviewer. Individual reviewers use\n"
+            "start --kind review."
         ),
         epilog=(
-            "bundle.json has exact top-level fields "
-            "contract_version=adt.portable-cold-review-bundle.v0, work_order, "
-            "and paths. The full closed contract is "
-            "conformance/portable-cold-review-contract-v0.md in the source "
-            "distribution."
+            "bundle.json exact top-level fields:\n"
+            "  contract_version\n"
+            "  work_order\n"
+            "  paths\n"
+            "contract_version value:\n"
+            "  adt.portable-cold-review-bundle.v0\n"
+            "Full closed contract in the source distribution:\n"
+            "  conformance/portable-cold-review-contract-v0.md"
         ),
     )
     review_gate.add_argument(
