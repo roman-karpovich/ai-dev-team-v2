@@ -1,7 +1,8 @@
 # Verification environments
 
-Load this reference only when a required check needs an unavailable dependency,
-runtime, production bootstrap, or load-bearing environment equivalence.
+Load this reference whenever any check executes source, artifact, or runtime.
+Also load it when a required check needs an unavailable dependency, runtime,
+production bootstrap, or load-bearing environment equivalence.
 
 ## Required outcomes
 
