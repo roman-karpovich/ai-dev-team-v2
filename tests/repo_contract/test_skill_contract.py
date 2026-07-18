@@ -17,6 +17,7 @@ LIFECYCLE = PLUGIN / "references/task-lifecycle.md"
 EXPECTED_REFERENCES = {
     "develop": {
         "claude-runtime.md",
+        "convergence-control.md",
         "incident-observability.md",
         "semantic-boundaries.md",
         "task-lifecycle.md",
@@ -25,6 +26,7 @@ EXPECTED_REFERENCES = {
     "review": {
         "claude-runtime.md",
         "cold-independent-review.md",
+        "convergence-control.md",
         "incident-observability.md",
         "semantic-boundaries.md",
         "task-lifecycle.md",
@@ -78,6 +80,11 @@ EXPECTED_SKILL_ROUTES = {
             "references/semantic-boundaries.md",
             "before:task-contract",
         ),
+        (
+            "risk:stateful-ingestion|replay-cursor|transactions-concurrency|migrations-mixed-versions|retention-rebuild-rollback|malformed-failure|production-query-bounds|operational-prerequisites|repair:material-hold|plugin-card-interleave",
+            "references/convergence-control.md",
+            "before:candidate-edit|repair-restart|plugin-install",
+        ),
         CANDIDATE_BINDING_ROUTE,
         (
             "verification:unavailable-dependency|runtime|production-bootstrap|environment-equivalence",
@@ -90,6 +97,11 @@ EXPECTED_SKILL_ROUTES = {
             "request:cold|independent|two-model",
             "references/cold-independent-review.md",
             "before:artifact-inspection|repository-context|adt-state",
+        ),
+        (
+            "request:cold|independent|two-model|repair:material-hold|evidence:reuse",
+            "references/convergence-control.md",
+            "after:cold-preflight-if-triggered;before:review-key|check-selection|counted-cold-launch",
         ),
         (
             "host:claude",
@@ -486,6 +498,160 @@ class SkillContractTest(unittest.TestCase):
         reference = read(PLUGIN / "references/verification-environments.md")
         preface = reference.split("## Required outcomes", 1)[0]
         self.assertIn("any check executes source, artifact, or runtime", preface)
+
+    def test_convergence_control_is_conditional_and_identity_bound(self) -> None:
+        reference = " ".join(
+            read(PLUGIN / "references/convergence-control.md").split()
+        )
+
+        self.assertLessEqual(len(reference.split()), 1200)
+        self.assertIn(
+            "Use one compact pre-build risk synthesis only when the change "
+            "touches stateful ingestion, replay or cursor behavior, "
+            "transactions or concurrency, migrations or mixed versions, "
+            "retention, rebuild or rollback, malformed or failure behavior, "
+            "production query bounds, or operational prerequisites.",
+            reference,
+        )
+        self.assertIn(
+            "Do not require a durable ledger or this synthesis for every small task.",
+            reference,
+        )
+        self.assertIn(
+            "`ArtifactKey` is repository identity + immutable `BASE` + "
+            "immutable `HEAD` + the ADT snapshot digest including dirty state.",
+            reference,
+        )
+        self.assertIn(
+            "`ReviewKey` is `ArtifactKey` + task-contract or work-order digest "
+            "+ assurance profile.",
+            reference,
+        )
+        self.assertIn(
+            "One review generation is every counted cold path for one `ReviewKey`; "
+            "several reviewers on that candidate still consume one generation.",
+            reference,
+        )
+
+    def test_convergence_control_bounds_cold_launches_and_repairs(self) -> None:
+        reference = " ".join(
+            read(PLUGIN / "references/convergence-control.md").split()
+        )
+
+        for purpose in (
+            "`adversarial-integration`",
+            "`known-finding-validation`",
+            "`diagnostic-cold`",
+            "`final-cold`",
+            "`complementary-final-cold`",
+        ):
+            self.assertIn(purpose, reference)
+        self.assertIn(
+            "A final-acceptance cold path is eligible ex ante only when its "
+            "artifact is immutable and clean, contract and accepted domain are "
+            "fixed, focused checks are current for its `ArtifactKey`, "
+            "adversarial integration is done, known blockers, evidence gaps, "
+            "and owner decisions are closed, and no edit lane is active or planned.",
+            reference,
+        )
+        self.assertIn(
+            "An explicit `diagnostic-cold` path may reduce uncertainty but never "
+            "counts as final acceptance.",
+            reference,
+        )
+        self.assertIn(
+            "Do not launch cold review on a candidate with a known-open blocker "
+            "or planned edit.",
+            reference,
+        )
+        self.assertIn(
+            "The first material `HOLD` generation permits one consolidated repair "
+            "and focused validation by the finding-owning lineage.",
+            reference,
+        )
+        self.assertIn(
+            "A second distinct repaired `ReviewKey` with a material `HOLD` "
+            "requires `REASSESS` before more edits",
+            reference,
+        )
+        self.assertIn(
+            "A third material `HOLD` requires a scope split, architecture change, "
+            "explicit owner decision, or documented rationale that continuing is "
+            "cheaper and safer.",
+            reference,
+        )
+        self.assertIn(
+            "Infrastructure failure, not launched, interrupted, no usable result, "
+            "independence compromised, and capability-only gaps stay fail-closed "
+            "but do not consume a material repair cycle.",
+            reference,
+        )
+
+    def test_convergence_control_reuses_only_exact_observed_evidence(self) -> None:
+        reference = " ".join(
+            read(PLUGIN / "references/convergence-control.md").split()
+        )
+        verification = " ".join(
+            read(PLUGIN / "references/verification-environments.md").split()
+        )
+        cold = " ".join(
+            read(PLUGIN / "references/cold-independent-review.md").split()
+        )
+
+        self.assertIn(
+            "An exact receipt matches `ArtifactKey`, canonical command, working "
+            "directory and selection, toolchain, dependency and build digests, "
+            "fixtures, migrations, schema and database reset, plus relevant "
+            "environment, database and container identity.",
+            reference,
+        )
+        self.assertIn("Never rerun a successful exact identity.", reference)
+        self.assertIn(
+            "After a candidate change, run the smallest affected check and one "
+            "proportionate final full gate.",
+            reference,
+        )
+        self.assertIn(
+            "Do not reuse evidence across SHAs automatically until dependency-aware "
+            "invalidation exists.",
+            reference,
+        )
+        self.assertIn("Unknown or unavailable is not zero.", reference)
+        self.assertIn(
+            "Evidence reuse follows `references/convergence-control.md`", verification
+        )
+        self.assertIn(
+            "Declare the path purpose and `ReviewKey` under "
+            "`references/convergence-control.md` before launch.",
+            cold,
+        )
+
+    def test_convergence_control_separates_plugin_work_and_observed_metrics(self) -> None:
+        reference = " ".join(
+            read(PLUGIN / "references/convergence-control.md").split()
+        )
+
+        self.assertIn(
+            "Checkpoint the card, batch compatible plugin surgery, install one "
+            "payload, then resume the card.",
+            reference,
+        )
+        self.assertIn(
+            "Do not cachebust for documentation or test-only adjustments that "
+            "cannot affect installed behavior.",
+            reference,
+        )
+        self.assertIn(
+            "Identity, start, end, terminal state, tokens, and cost are metrics "
+            "only when a launcher or backend actually observes them; never ask a "
+            "model to attest them.",
+            reference,
+        )
+        self.assertIn(
+            "Prefer premature-cold rate over penalizing an eligible final cold "
+            "path that finds a material defect.",
+            reference,
+        )
 
     def test_cold_review_preflight_forbids_shared_coordination_registries(self) -> None:
         reference = read(PLUGIN / "references/cold-independent-review.md")

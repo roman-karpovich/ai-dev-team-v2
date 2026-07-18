@@ -27,6 +27,11 @@ Start with the smallest ready offline check that can distinguish the accepted
 behavior from the relevant defect. State what it proves and what it cannot
 prove. A green command is not evidence for behavior outside its seam.
 
+Evidence reuse follows `references/convergence-control.md`: reuse only an
+immutable exact-identity success, never a merely similar command or mutable
+cache entry. After candidate change, select the smallest affected seam before
+one proportionate final gate.
+
 When environment equivalence is load-bearing, identify the concrete property:
 dependency version, service behavior, framework bootstrap, database
 transaction semantics, process lifecycle, network, or platform configuration.

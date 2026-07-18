@@ -17,6 +17,7 @@ All `references/...` locators below resolve from the installed plugin root.
 | Trigger | Resource | Boundary |
 | --- | --- | --- |
 | `request:cold\|independent\|two-model` | `references/cold-independent-review.md` | `before:artifact-inspection\|repository-context\|adt-state` |
+| `request:cold\|independent\|two-model\|repair:material-hold\|evidence:reuse` | `references/convergence-control.md` | `after:cold-preflight-if-triggered;before:review-key\|check-selection\|counted-cold-launch` |
 | `host:claude` | `references/claude-runtime.md` | `after:cold-if-triggered;before:repository-exposure\|adt-state\|artifact-inspection` |
 | `always` | `references/task-lifecycle.md` | `after:prior-preflights;before:adt-state\|mutation` |
 | `depends-on:auto-reporting\|framework-lifecycle\|process-lifecycle\|termination\|propagation\|bootstrap\|event-cardinality` | `references/incident-observability.md` | `before:claim-artifact-inspection` |
@@ -41,6 +42,8 @@ left to right.
    severities, proposed fixes, and expected conclusions.
 4. For each counted cold path, use a distinct checkout, fresh inference
    context, standalone path-specific `kind=review` state, and sealed output.
+   Declare its purpose and `ReviewKey` first; a diagnostic path is not final
+   acceptance, and a final path must be eligible before it launches.
    A counted reviewer owns exactly one path and returns one sealed
    findings-first report.
    Quiesce the launcher lane first and run counted paths one at a time as the

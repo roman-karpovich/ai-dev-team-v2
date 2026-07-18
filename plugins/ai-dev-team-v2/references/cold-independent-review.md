@@ -40,6 +40,12 @@ Make the launcher lane quiescent before starting a counted path. Here,
 `other-child-agents` means every development or review child other than the
 launcher and the one reviewer about to start.
 
+Declare the path purpose and `ReviewKey` under
+`references/convergence-control.md` before launch. A diagnostic path does not
+count as final acceptance. For one generation, run declared counted paths one
+at a time, keep each conclusion sealed, then consolidate findings before one
+repair.
+
 | Boundary | Trigger | Required | On unmet |
 | --- | --- | --- | --- |
 | `quiescent-counted-path` | `before:counted-cold-launch` | `other-child-agents:terminal;counted-reviewers:one-at-a-time;reviewer-handle:hidden-from-other-agents` | `launch:defer` |
