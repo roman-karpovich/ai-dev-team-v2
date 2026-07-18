@@ -179,6 +179,26 @@ class AdtCliTest(unittest.TestCase):
         )
         self.assertEqual("task_open", error["error"]["code"])
 
+    def test_review_gate_help_routes_individual_reviewers_to_task_lifecycle(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(ADT), "review-gate", "--help"],
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        help_text = " ".join(result.stdout.lower().split())
+        self.assertIn("launcher-only", help_text)
+        self.assertIn("not an individual review path", help_text)
+        self.assertIn("at least two sealed paths", help_text)
+        self.assertIn("does not launch a reviewer", help_text)
+        self.assertIn("adt.portable-cold-review-bundle.v0", help_text)
+        self.assertIn("bundle.json", help_text)
+        self.assertIn("work_order", help_text)
+        self.assertIn("paths", help_text)
+        self.assertIn("--bundle directory", help_text)
+
     def test_start_rejects_blank_goal_without_creating_state(self) -> None:
         for goal in ("", " \n\t"):
             with self.subTest(goal=goal):

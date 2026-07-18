@@ -41,8 +41,13 @@ left to right.
    severities, proposed fixes, and expected conclusions.
 4. For each counted cold path, use a distinct checkout, fresh inference
    context, standalone path-specific `kind=review` state, and sealed output.
+   A counted reviewer owns exactly one path and returns one sealed
+   findings-first report.
    Quiesce the launcher lane first and run counted paths one at a time as the
    cold-review reference requires.
+   Do not run `adt review-gate` inside a counted path. It is a launcher-only
+   aggregator for already sealed multi-path evidence, not a review lifecycle
+   command. Do not create `bundle.json` or ask for its schema.
    Never hand off between cold paths, resume another path's state, or read its
    context. Keep every path's findings hidden until all counted paths have
    fixed their results; adjudicate only then.
@@ -67,6 +72,8 @@ later work there is repair validation, never a fresh cold path. Preserve
   evidence, the violated accepted claim or repository constraint, and the
   reachable in-domain consequence. Distinguish blockers, non-blocking
   observations, and open questions. If none survive, state residual gaps.
+- Record a missing normative input as a terminal gap or `HOLD`; never ask the
+  launcher, root, owner, or another agent for it.
 - Checkpoint neutral evidence and conclusions only within the current lineage.
   Keep a cold path's output sealed until the cross-path embargo ends.
 

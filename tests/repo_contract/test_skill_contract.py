@@ -174,6 +174,12 @@ QUIESCENT_COLD_BOUNDARIES = {
         "stop:review",
         "path:independence-compromised;conclusion:do-not-count",
     ),
+    (
+        "outbound-cross-agent-contact",
+        "action:cross-agent-question-or-message",
+        "stop:review;reply:do-not-wait-or-read;state:complete-if-owned;return:terminal",
+        "path:independence-compromised;conclusion:do-not-count",
+    ),
 }
 MODEL_FIELD = r"model(?:_name|_id)?"
 MODEL_KEY = rf"(?:(?:default|preferred|selected|fallback)_)?{MODEL_FIELD}"
@@ -498,6 +504,68 @@ class SkillContractTest(unittest.TestCase):
         reference = read(PLUGIN / "references/cold-independent-review.md")
 
         self.assertEqual(QUIESCENT_COLD_BOUNDARIES, policy_boundary_rows(reference))
+
+    def test_counted_reviewer_uses_standalone_lifecycle_without_portable_gate(self) -> None:
+        reference = " ".join(
+            read(PLUGIN / "references/cold-independent-review.md").split()
+        )
+        _, review_skill = frontmatter(SKILLS / "review" / "SKILL.md")
+        review_skill = " ".join(review_skill.split())
+        lifecycle = " ".join(read(LIFECYCLE).split())
+
+        self.assertIn(
+            "A counted reviewer uses the normal standalone `kind=review` task "
+            "lifecycle.",
+            reference,
+        )
+        self.assertIn(
+            "Never run `adt review-gate` inside an individual review path",
+            reference,
+        )
+        self.assertIn(
+            "Do not run `adt review-gate` inside a counted path.",
+            review_skill,
+        )
+        self.assertIn(
+            "A counted reviewer owns exactly one path and returns one sealed "
+            "findings-first report.",
+            review_skill,
+        )
+        self.assertIn(
+            "Do not create `bundle.json` or ask for its schema.",
+            review_skill,
+        )
+        self.assertIn(
+            "Record a missing normative input as a terminal gap or `HOLD`; "
+            "never ask the launcher, root, owner, or another agent for it.",
+            review_skill,
+        )
+        self.assertIn(
+            "`review-gate` is a launcher/composer command used only after at "
+            "least two paths are sealed.",
+            lifecycle,
+        )
+
+    def test_outbound_contact_self_aborts_without_waiting_for_a_reply(self) -> None:
+        reference = " ".join(
+            read(PLUGIN / "references/cold-independent-review.md").split()
+        )
+
+        self.assertIn(
+            "If outbound contact is sent or attempted, do not wait for, read, "
+            "or use a reply.",
+            reference,
+        )
+        self.assertIn(
+            "complete it with summary `independence-compromised: "
+            "outbound-cross-agent-contact`",
+            reference,
+        )
+        self.assertIn(
+            "do not create state only to record the abort",
+            reference,
+        )
+        self.assertIn("The launcher must not answer.", reference)
 
     def test_specialist_references_retain_fail_closed_boundaries(self) -> None:
         references = PLUGIN / "references"

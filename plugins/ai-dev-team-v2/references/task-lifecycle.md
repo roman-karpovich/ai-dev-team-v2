@@ -39,8 +39,9 @@ release recommendation or authorization.
 
 These are the canonical task-state forms used by the skills, not exhaustive CLI
 help. An optional `start --profile "$PROFILE"` records a durable label when the
-user selects one. The workspace-independent `review-gate` command is outside
-the task lifecycle and deliberately omitted here.
+user selects one. `review-gate` is a launcher/composer command used only after
+at least two paths are sealed. It is outside the task lifecycle and deliberately
+omitted here; a standalone reviewer never invokes it or requests its bundle.
 
 Use JSON responses as the source of task and lease values:
 
