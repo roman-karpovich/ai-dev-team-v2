@@ -155,6 +155,26 @@ REQUIRED_SPECIALIST_BOUNDARIES = {
         ),
     },
 }
+QUIESCENT_COLD_BOUNDARIES = {
+    (
+        "quiescent-counted-path",
+        "before:counted-cold-launch",
+        "other-child-agents:terminal;counted-reviewers:one-at-a-time;reviewer-handle:hidden-from-other-agents",
+        "launch:defer",
+    ),
+    (
+        "sealed-conclusion-embargo",
+        "from:launch;until:conclusion-sealed",
+        "forbid:spawn-agent,send-message,follow-up,interrupt;wait:terminal-result",
+        "path:independence-compromised;conclusion:do-not-count",
+    ),
+    (
+        "unsolicited-cross-agent-contact",
+        "message:cross-agent-unsolicited",
+        "stop:review",
+        "path:independence-compromised;conclusion:do-not-count",
+    ),
+}
 MODEL_FIELD = r"model(?:_name|_id)?"
 MODEL_KEY = rf"(?:(?:default|preferred|selected|fallback)_)?{MODEL_FIELD}"
 MODEL_PLACEHOLDERS = frozenset({"unknown", "string", "null", "none"})
@@ -473,6 +493,11 @@ class SkillContractTest(unittest.TestCase):
             normalized_preflight,
         )
         self.assertIn("independence-compromised", preflight)
+
+    def test_counted_cold_review_requires_a_quiescent_launcher_lane(self) -> None:
+        reference = read(PLUGIN / "references/cold-independent-review.md")
+
+        self.assertEqual(QUIESCENT_COLD_BOUNDARIES, policy_boundary_rows(reference))
 
     def test_specialist_references_retain_fail_closed_boundaries(self) -> None:
         references = PLUGIN / "references"
