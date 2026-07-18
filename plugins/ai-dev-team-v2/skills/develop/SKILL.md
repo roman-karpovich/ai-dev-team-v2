@@ -19,6 +19,7 @@ All `references/...` locators below resolve from the installed plugin root.
 | `always` | `references/task-lifecycle.md` | `after:claude-if-triggered;before:adt-state\|mutation` |
 | `depends-on:auto-reporting\|framework-lifecycle\|process-lifecycle\|termination\|propagation\|bootstrap\|event-cardinality` | `references/incident-observability.md` | `before:task-contract\|candidate-edit` |
 | `acceptance:input-domain\|upstream-replacement:removed,deprecated,unavailable->local-derivation` | `references/semantic-boundaries.md` | `before:task-contract` |
+| `check:executes-source\|artifact\|runtime` | `references/verification-environments.md` | `before:check-execution\|result-interpretation` |
 | `verification:unavailable-dependency\|runtime\|production-bootstrap\|environment-equivalence` | `references/verification-environments.md` | `before:verification-selection` |
 
 `|` joins alternatives or boundary members; `;` sequences boundaries from

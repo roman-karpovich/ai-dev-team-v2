@@ -34,6 +34,11 @@ EXPECTED_REFERENCES = {
 REPOSITORY_BLOB_ROOT = (
     "https://github.com/roman-karpovich/ai-dev-team-v2/blob/master/"
 )
+CANDIDATE_BINDING_ROUTE = (
+    "check:executes-source|artifact|runtime",
+    "references/verification-environments.md",
+    "before:check-execution|result-interpretation",
+)
 EXPECTED_TASK_STATE_COMMANDS = {
     tuple(shlex.split(command))
     for command in (
@@ -73,6 +78,7 @@ EXPECTED_SKILL_ROUTES = {
             "references/semantic-boundaries.md",
             "before:task-contract",
         ),
+        CANDIDATE_BINDING_ROUTE,
         (
             "verification:unavailable-dependency|runtime|production-bootstrap|environment-equivalence",
             "references/verification-environments.md",
@@ -105,6 +111,7 @@ EXPECTED_SKILL_ROUTES = {
             "references/semantic-boundaries.md",
             "before:claim-judgment",
         ),
+        CANDIDATE_BINDING_ROUTE,
         (
             "verification:unavailable-dependency|runtime|production-bootstrap|environment-equivalence",
             "references/verification-environments.md",
@@ -443,6 +450,16 @@ class SkillContractTest(unittest.TestCase):
             _, body = frontmatter(SKILLS / name / "SKILL.md")
             with self.subTest(skill=name):
                 self.assertEqual(expected, skill_route_rows(body))
+
+    def test_candidate_binding_is_reachable_before_every_executed_check(self) -> None:
+        for name in EXPECTED_SKILL_ROUTES:
+            _, body = frontmatter(SKILLS / name / "SKILL.md")
+            with self.subTest(skill=name):
+                self.assertIn(CANDIDATE_BINDING_ROUTE, skill_route_rows(body))
+
+        reference = read(PLUGIN / "references/verification-environments.md")
+        preface = reference.split("## Required outcomes", 1)[0]
+        self.assertIn("any check executes source, artifact, or runtime", preface)
 
     def test_specialist_references_retain_fail_closed_boundaries(self) -> None:
         references = PLUGIN / "references"
