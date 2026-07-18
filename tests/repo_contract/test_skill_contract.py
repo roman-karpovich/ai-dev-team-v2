@@ -461,6 +461,17 @@ class SkillContractTest(unittest.TestCase):
         preface = reference.split("## Required outcomes", 1)[0]
         self.assertIn("any check executes source, artifact, or runtime", preface)
 
+    def test_cold_review_preflight_forbids_shared_coordination_registries(self) -> None:
+        reference = read(PLUGIN / "references/cold-independent-review.md")
+        preflight = reference.split("## Isolate the path", 1)[0]
+
+        self.assertIn("agent, task, or thread registries", preflight)
+        self.assertIn("teammate status feeds", preflight)
+        self.assertIn("messages", preflight)
+        self.assertIn("transcripts", preflight)
+        self.assertIn("another path's progress", preflight)
+        self.assertIn("independence-compromised", preflight)
+
     def test_specialist_references_retain_fail_closed_boundaries(self) -> None:
         references = PLUGIN / "references"
         for name, required in REQUIRED_SPECIALIST_BOUNDARIES.items():
