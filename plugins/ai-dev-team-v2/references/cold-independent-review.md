@@ -45,10 +45,26 @@ launcher and the one reviewer about to start.
 | `quiescent-counted-path` | `before:counted-cold-launch` | `other-child-agents:terminal;counted-reviewers:one-at-a-time;reviewer-handle:hidden-from-other-agents` | `launch:defer` |
 | `sealed-conclusion-embargo` | `from:launch;until:conclusion-sealed` | `forbid:spawn-agent,send-message,follow-up,interrupt;wait:terminal-result` | `path:independence-compromised;conclusion:do-not-count` |
 | `unsolicited-cross-agent-contact` | `message:cross-agent-unsolicited` | `stop:review` | `path:independence-compromised;conclusion:do-not-count` |
+| `outbound-cross-agent-contact` | `action:cross-agent-question-or-message` | `stop:review;reply:do-not-wait-or-read;state:complete-if-owned;return:terminal` | `path:independence-compromised;conclusion:do-not-count` |
 
 The launcher may remain active only to wait for and receive the terminal result.
 If the host cannot prevent an unsolicited child-to-reviewer message with this
 lane quiescent, do not count that path as independent.
+
+The reviewer must not send a question, progress update, or request to the
+launcher or another agent. Resolve tooling questions only from the neutral work
+order, the isolated repository, and installed plugin resources. If outbound
+contact is sent or attempted, do not wait for, read, or use a reply. Stop
+inspection and checks. If the path owns active standalone review state,
+complete it with summary `independence-compromised: outbound-cross-agent-contact`;
+otherwise, do not create state only to record the abort. Return the terminal
+marker and exit immediately. The launcher must not answer.
+
+A counted reviewer uses the normal standalone `kind=review` task lifecycle.
+Never run `adt review-gate` inside an individual review path: it is a
+launcher-only, post-embargo aggregator for bundles containing at least two
+already sealed paths. An individual reviewer neither creates that bundle nor
+needs its schema.
 
 - Give every counted cold path a distinct review checkout exposing the accepted
   immutable `BASE..HEAD`, a fresh inference context, standalone path-specific

@@ -1496,8 +1496,30 @@ def build_parser() -> JsonArgumentParser:
     complete.add_argument("--lease", required=True)
     complete.add_argument("--summary")
 
-    review_gate = subparsers.add_parser("review-gate")
-    review_gate.add_argument("--bundle", required=True)
+    review_gate = subparsers.add_parser(
+        "review-gate",
+        help="Launcher-only gate for completed portable cold-review evidence.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=(
+            "Launcher-only aggregator for a portable cold-review bundle after "
+            "at least two sealed paths. This is not an individual review path; "
+            "individual reviewers use the standalone task lifecycle with "
+            "start --kind review. It does not launch a reviewer."
+        ),
+        epilog=(
+            "bundle.json has exact top-level fields "
+            "contract_version=adt.portable-cold-review-bundle.v0, work_order, "
+            "and paths. The full closed contract is "
+            "conformance/portable-cold-review-contract-v0.md in the source "
+            "distribution."
+        ),
+    )
+    review_gate.add_argument(
+        "--bundle",
+        required=True,
+        metavar="DIRECTORY",
+        help="Directory containing bundle.json and its referenced files.",
+    )
     return parser
 
 
