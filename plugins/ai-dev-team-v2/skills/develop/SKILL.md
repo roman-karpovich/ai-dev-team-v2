@@ -19,6 +19,7 @@ All `references/...` locators below resolve from the installed plugin root.
 | `always` | `references/task-lifecycle.md` | `after:claude-if-triggered;before:adt-state\|mutation` |
 | `depends-on:auto-reporting\|framework-lifecycle\|process-lifecycle\|termination\|propagation\|bootstrap\|event-cardinality` | `references/incident-observability.md` | `before:task-contract\|candidate-edit` |
 | `acceptance:input-domain\|upstream-replacement:removed,deprecated,unavailable->local-derivation` | `references/semantic-boundaries.md` | `before:task-contract` |
+| `risk:stateful-ingestion\|replay-cursor\|transactions-concurrency\|migrations-mixed-versions\|retention-rebuild-rollback\|malformed-failure\|production-query-bounds\|operational-prerequisites\|repair:material-hold\|plugin-card-interleave` | `references/convergence-control.md` | `before:candidate-edit\|repair-restart\|plugin-install` |
 | `check:executes-source\|artifact\|runtime` | `references/verification-environments.md` | `before:check-execution\|result-interpretation` |
 | `verification:unavailable-dependency\|runtime\|production-bootstrap\|environment-equivalence` | `references/verification-environments.md` | `before:verification-selection` |
 
@@ -54,6 +55,9 @@ remaining open decisions.
 
 - Inspect before editing. Use the host's native planning, tools, delegation,
   and repository workflows rather than recreating them here.
+- When the convergence route fires, synthesize the applicable failure seams
+  before candidate edits. Keep that compact model in the working plan unless a
+  normal repository decision or checkpoint must outlive the session.
 - Prefer a focused failing test before behavior-changing code. Choose the
   smallest verification seam that can distinguish the required behavior from
   the relevant defect; a self-confirming mock or irrelevant green suite is not
