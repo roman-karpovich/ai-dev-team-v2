@@ -10,7 +10,7 @@
       "name": "ai-dev-team",
       "source": "./plugins/ai-dev-team-v2",
       "description": "Controlled, resumable development and evidence-based review across native coding hosts.",
-      "version": "0.1.45",
+      "version": "0.1.46",
       "author": {
         "name": "AI Dev Team contributors"
       },
