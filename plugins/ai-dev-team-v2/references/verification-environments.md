@@ -7,8 +7,18 @@ runtime, production bootstrap, or load-bearing environment equivalence.
 
 | Boundary | Trigger | Required | On unmet |
 | --- | --- | --- | --- |
+| `candidate-binding` | `check:executes-source\|artifact\|runtime` | `prove:executed-candidate->intended-worktree\|commit\|snapshot;cached\|baked\|generated:rebuild\|refresh\|fingerprint` | `candidate-binding:unverified;affected-claim:withhold` |
 | `discriminating-seam` | `check:selected` | `record:proves,cannot-prove;claim:within-seam-only` | `outside-seam:unverified` |
 | `secret-safe-setup` | `required-environment:unavailable` | `forbid:secret-files,credentials,tokens,mutable-runtime-state@workspace,tool-output,logs,checkpoints,review-evidence;allow:checked-in-fixtures,dummy-values,secret-free-config` | `verification:blocked-if-no-safe-setup` |
+
+## Bind the executed candidate
+
+Before interpreting a check, prove that the source, artifact, or runtime actually
+executed corresponds to the intended worktree, commit, or snapshot. A command
+selected by repository documentation is not proof of that binding. Treat a
+cached, baked, or generated artifact as unverified until it is rebuilt or
+refreshed from the intended candidate, or its fingerprint is matched to that
+candidate. Withhold only claims that rely on an unbound candidate.
 
 ## Select a discriminating seam
 

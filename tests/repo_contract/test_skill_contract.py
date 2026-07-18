@@ -129,6 +129,12 @@ REQUIRED_SPECIALIST_BOUNDARIES = {
     },
     "verification-environments.md": {
         (
+            "candidate-binding",
+            "check:executes-source|artifact|runtime",
+            "prove:executed-candidate->intended-worktree|commit|snapshot;cached|baked|generated:rebuild|refresh|fingerprint",
+            "candidate-binding:unverified;affected-claim:withhold",
+        ),
+        (
             "discriminating-seam",
             "check:selected",
             "record:proves,cannot-prove;claim:within-seam-only",
