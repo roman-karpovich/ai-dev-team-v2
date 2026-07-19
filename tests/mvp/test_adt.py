@@ -256,6 +256,381 @@ class AdtCliTest(unittest.TestCase):
         self.assertEqual(lock_mode_before, lock_mode_after)
         self.assertEqual(lock_mtime_before, lock_mtime_after)
 
+    def test_report_projects_private_canonical_history_deterministically(
+        self,
+    ) -> None:
+        first = self._start()
+        checkpoint, _ = self._adt(
+            "checkpoint",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(first),
+            "--note",
+            "private checkpoint prose",
+        )
+        paused, _ = self._adt(
+            "pause",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(checkpoint),
+            "--reason",
+            "private pause reason",
+        )
+        self.assertEqual("paused", paused["task"]["status"])
+        resumed, _ = self._adt("resume", "--host", "codex")
+        taken_over, _ = self._adt(
+            "takeover",
+            "--host",
+            "codex",
+            "--reason",
+            "private takeover reason",
+        )
+        self.assertNotEqual(self._lease(resumed), self._lease(taken_over))
+        completed, _ = self._adt(
+            "complete",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(taken_over),
+            "--summary",
+            "private completion summary",
+        )
+        second, _ = self._adt(
+            "start",
+            "--host",
+            "claude",
+            "--kind",
+            "review",
+            "--profile",
+            "critical",
+            "--goal",
+            "private historical goal",
+        )
+        state_path, _ = self._stored_state()
+        state_before = state_path.read_bytes()
+
+        current, _ = self._adt("report")
+        current_task = second["task"]
+        self.assertEqual(
+            {
+                "ok": True,
+                "command": "report",
+                "report": {
+                    "report_version": "adt.pilot-run-report.v0",
+                    "task": {
+                        "id": current_task["id"],
+                        "kind": "review",
+                        "profile": "critical",
+                        "status": "active",
+                    },
+                    "timestamps": {
+                        "created_at": current_task["created_at"],
+                        "updated_at": current_task["updated_at"],
+                        "completed_at": None,
+                    },
+                    "counts": {
+                        "checkpoints": {
+                            "manual": 0,
+                            "pause": 0,
+                            "handoff": 0,
+                            "drift-accepted": 0,
+                            "complete": 0,
+                        },
+                        "inferred_resumes": 0,
+                        "takeovers": 0,
+                    },
+                    "persisted_latest_snapshot": {
+                        "head": current_task["snapshot"]["head"],
+                        "digest": current_task["snapshot"]["digest"],
+                        "dirty": current_task["snapshot"]["dirty"],
+                        "change_total": current_task["snapshot"]["changes"][
+                            "total"
+                        ],
+                        "change_truncated": current_task["snapshot"]["changes"][
+                            "truncated"
+                        ],
+                    },
+                },
+            },
+            current,
+        )
+
+        task_id = first["task"]["id"]
+        historical, first_run = self._adt("report", "--task", task_id)
+        repeated, second_run = self._adt("report", "--task", task_id)
+        terminal_task = completed["task"]
+        expected_report = {
+            "report_version": "adt.pilot-run-report.v0",
+            "task": {
+                "id": task_id,
+                "kind": "develop",
+                "profile": "balanced",
+                "status": "completed",
+            },
+            "timestamps": {
+                "created_at": terminal_task["created_at"],
+                "updated_at": terminal_task["updated_at"],
+                "completed_at": terminal_task["completed_at"],
+            },
+            "counts": {
+                "checkpoints": {
+                    "manual": 1,
+                    "pause": 1,
+                    "handoff": 0,
+                    "drift-accepted": 0,
+                    "complete": 1,
+                },
+                "inferred_resumes": 1,
+                "takeovers": 1,
+            },
+            "persisted_latest_snapshot": {
+                "head": terminal_task["snapshot"]["head"],
+                "digest": terminal_task["snapshot"]["digest"],
+                "dirty": terminal_task["snapshot"]["dirty"],
+                "change_total": terminal_task["snapshot"]["changes"]["total"],
+                "change_truncated": terminal_task["snapshot"]["changes"][
+                    "truncated"
+                ],
+            },
+        }
+        self.assertEqual(
+            {"ok": True, "command": "report", "report": expected_report},
+            historical,
+        )
+        self.assertEqual(historical, repeated)
+        self.assertEqual(first_run.stdout.encode(), second_run.stdout.encode())
+        self.assertEqual(state_before, state_path.read_bytes())
+
+        encoded = json.dumps(historical, sort_keys=True)
+        for private_value in (
+            str(self.repo),
+            "Add a focused behavior",
+            "private checkpoint prose",
+            "private pause reason",
+            "private takeover reason",
+            "private completion summary",
+            "codex",
+        ):
+            self.assertNotIn(private_value, encoded)
+        for omitted_key in (
+            "workspace",
+            "root",
+            "path",
+            "goal",
+            "summary",
+            "note",
+            "reason",
+            "lease",
+            "host",
+            "token",
+            "cost",
+            "model",
+            "review",
+        ):
+            self.assertNotIn(f'"{omitted_key}"', encoded)
+
+    def test_report_counts_a_resume_that_accepts_drift(self) -> None:
+        started = self._start()
+        self._adt(
+            "pause",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+        )
+        (self.repo / "app.txt").write_text("drifted while paused\n")
+        resumed, _ = self._adt("resume", "--host", "codex", "--accept-drift")
+
+        report, _ = self._adt("report")
+
+        self.assertEqual("drift-accepted", resumed["checkpoint"]["kind"])
+        self.assertEqual(1, report["report"]["counts"]["inferred_resumes"])
+        self.assertEqual(
+            1,
+            report["report"]["counts"]["checkpoints"]["drift-accepted"],
+        )
+
+    def test_report_uses_a_shared_lock_without_mutating_state(self) -> None:
+        self._start()
+        state_path, state = self._stored_state()
+        lock_path = state_path.with_name("state.lock")
+        state_before = state_path.read_bytes()
+        lock_path.chmod(0o400)
+        lock_mode_before = stat.S_IMODE(lock_path.stat().st_mode)
+        lock_mtime_before = lock_path.stat().st_mtime_ns
+        try:
+            with lock_path.open("rb") as held_lock:
+                fcntl.flock(held_lock.fileno(), fcntl.LOCK_SH)
+                try:
+                    payload, _ = self._adt("report", timeout=2)
+                    self.assertTrue(payload["ok"])
+                finally:
+                    fcntl.flock(held_lock.fileno(), fcntl.LOCK_UN)
+            lock_mode_after = stat.S_IMODE(lock_path.stat().st_mode)
+            lock_mtime_after = lock_path.stat().st_mtime_ns
+        finally:
+            lock_path.chmod(0o600)
+
+        self.assertEqual(state_before, state_path.read_bytes())
+        self.assertEqual(state["revision"], self._stored_state()[1]["revision"])
+        self.assertEqual(lock_mode_before, lock_mode_after)
+        self.assertEqual(lock_mtime_before, lock_mtime_after)
+
+    def test_report_output_is_canonical_and_uses_only_persisted_snapshot(
+        self,
+    ) -> None:
+        started = self._start()
+        completed, _ = self._adt(
+            "complete",
+            "--host",
+            "codex",
+            "--lease",
+            self._lease(started),
+        )
+        state_path, _ = self._stored_state()
+        state_before = state_path.read_bytes()
+        output = self.repo / "pilot-report.json"
+
+        payload, result = self._adt("report", "--output", str(output))
+
+        self.assertEqual(
+            {"ok": True, "command": "report", "output_written": True},
+            {key: value for key, value in payload.items() if key != "report"},
+        )
+        self.assertNotIn(str(output), result.stdout)
+        expected_bytes = (
+            json.dumps(
+                payload["report"],
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+            + "\n"
+        ).encode("utf-8")
+        self.assertEqual(expected_bytes, output.read_bytes())
+        self.assertEqual(state_before, state_path.read_bytes())
+        self.assertEqual(
+            completed["task"]["snapshot"]["digest"],
+            payload["report"]["persisted_latest_snapshot"]["digest"],
+        )
+        self.assertFalse(payload["report"]["persisted_latest_snapshot"]["dirty"])
+        self.assertIn("?? pilot-report.json", self._git("status", "--short").stdout)
+
+    def test_report_output_failure_preserves_target_and_cleans_owned_temp(
+        self,
+    ) -> None:
+        runtime = self._load_runtime()
+        output = Path(self.temp_dir.name) / "existing-report.json"
+        original = b"owner content\n"
+        output.write_bytes(original)
+
+        with mock.patch.object(
+            runtime.os,
+            "replace",
+            side_effect=OSError("private machine path"),
+        ):
+            with self.assertRaises(runtime.CliError) as raised:
+                runtime._publish_report(output, b'{"report":true}\n')
+
+        self.assertEqual("report_output_unavailable", raised.exception.code)
+        self.assertNotIn(str(output), raised.exception.message)
+        self.assertNotIn("private machine path", raised.exception.message)
+        self.assertEqual(original, output.read_bytes())
+        self.assertEqual(
+            [],
+            list(output.parent.glob(f".{output.name}.*.tmp")),
+        )
+
+    def test_report_output_file_fsync_failure_prevents_replace(self) -> None:
+        runtime = self._load_runtime()
+        output = Path(self.temp_dir.name) / "existing-report.json"
+        original = b"owner content\n"
+        output.write_bytes(original)
+
+        with (
+            mock.patch.object(
+                runtime.os,
+                "fsync",
+                side_effect=OSError("private machine path"),
+            ),
+            mock.patch.object(runtime.os, "replace") as replace,
+        ):
+            with self.assertRaises(runtime.CliError) as raised:
+                runtime._publish_report(output, b'{"report":true}\n')
+
+        self.assertEqual("report_output_unavailable", raised.exception.code)
+        self.assertNotIn(str(output), raised.exception.message)
+        self.assertNotIn("private machine path", raised.exception.message)
+        replace.assert_not_called()
+        self.assertEqual(original, output.read_bytes())
+        self.assertEqual(
+            [],
+            list(output.parent.glob(f".{output.name}.*.tmp")),
+        )
+
+    def test_report_output_reports_directory_fsync_failure_after_replace(
+        self,
+    ) -> None:
+        runtime = self._load_runtime()
+        output = Path(self.temp_dir.name) / "existing-report.json"
+        output.write_bytes(b"owner content\n")
+        replacement = b'{"report":true}\n'
+        original_fsync = runtime.os.fsync
+        fsync_calls = 0
+
+        def fail_directory_fsync(descriptor: int) -> None:
+            nonlocal fsync_calls
+            fsync_calls += 1
+            if fsync_calls == 2:
+                raise OSError("private machine path")
+            original_fsync(descriptor)
+
+        with mock.patch.object(
+            runtime.os,
+            "fsync",
+            side_effect=fail_directory_fsync,
+        ):
+            with self.assertRaises(runtime.CliError) as raised:
+                runtime._publish_report(output, replacement)
+
+        self.assertEqual("report_output_unavailable", raised.exception.code)
+        self.assertIn("published", raised.exception.message)
+        self.assertNotIn(str(output), raised.exception.message)
+        self.assertNotIn("private machine path", raised.exception.message)
+        self.assertEqual(replacement, output.read_bytes())
+        self.assertEqual(
+            [],
+            list(output.parent.glob(f".{output.name}.*.tmp")),
+        )
+
+    def test_report_rejects_unknown_tasks_and_text_expansion_without_mutation(
+        self,
+    ) -> None:
+        self._start()
+        state_path, state = self._stored_state()
+        state_before = state_path.read_bytes()
+        unknown_id = "task_" + "0" * 32
+
+        error, _ = self._adt(
+            "report",
+            "--task",
+            unknown_id,
+            expected_code=3,
+        )
+        self.assertEqual("task_unknown", error["error"]["code"])
+        self.assertEqual(unknown_id, error["error"]["details"]["task_id"])
+
+        usage, _ = self._adt(
+            "report",
+            "--include-text",
+            expected_code=2,
+        )
+        self.assertEqual("usage", usage["error"]["code"])
+        self.assertEqual(state_before, state_path.read_bytes())
+        self.assertEqual(state["revision"], self._stored_state()[1]["revision"])
+
     def test_mutation_lock_remains_exclusive(self) -> None:
         runtime = self._load_runtime()
 
@@ -403,7 +778,7 @@ class AdtCliTest(unittest.TestCase):
         self.assertNotIn("private machine path", raised.exception.message)
 
     def test_absent_state_has_no_task_status_and_empty_list(self) -> None:
-        for command in ("status", "context"):
+        for command in ("status", "context", "report"):
             with self.subTest(command=command):
                 error, _ = self._adt(command, expected_code=3)
                 self.assertEqual("no_task", error["error"]["code"])

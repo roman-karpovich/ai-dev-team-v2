@@ -34,18 +34,30 @@ plan under the convergence reference before resuming task action.
 
 1. Perform the minimum read-only orientation needed to identify the target
    worktree, then follow the lifecycle reference and inspect `status`.
-2. If no open task exists, inspect enough repository evidence to resolve
-   discoverable facts before asking the owner questions.
+2. If no open task exists, continue with this preflight. Investigate repository
+   context before asking questions. Resolve discoverable facts and routine
+   uncertainty yourself; use a stated reversible assumption when it stays
+   within authorized scope.
 3. Form `GOAL` as a compact neutral contract: desired outcome and observable
    success, constraints and non-goals, verified facts separated from
    assumptions, and authoritative owner decisions or unresolved choices.
    Exclude proposed fixes, persuasive reasoning, prior findings, and expected
    conclusions. Preserve the owner's outcome when evidence corrects a premise.
-4. Challenge only a material product, architecture, or risk fork. Investigate
-   ordinary uncertainty and proceed with a stated reversible assumption. Ask
-   one focused question for missing normative input; present alternatives only
-   when the answer selects a hard-to-reverse fork.
-5. Skip state only when observable success is already satisfied and no
+4. For every nontrivial task, ensure a bounded `grill me` dialogue has occurred
+   before candidate edits. Count material questions and decisions already
+   resolved in the current conversation; do not repeat them. State the task's
+   essence, surface contentious assumptions, risks, and genuine forks, then ask
+   one coherent bounded batch of remaining material questions. Challenge
+   answers when concrete tradeoffs warrant it. Do not ask investigable or
+   routine questions. If the owner explicitly says `grill me`, deepen the pass
+   even when the task initially appears specified. Skip the grill for an
+   explicit small, reversible task unless the owner requests it.
+5. Synthesize the resolved design as `task.md` content with its append-only
+   material decision log, then present one compact decision brief. Treat `да`,
+   `го`, `так`, or equivalent plain-language agreement as confirmation.
+   `task.md` is your synthesis and decision log, not an approval form. The owner
+   need not line-review it.
+6. Skip state only when observable success is already satisfied and no
    repository work remains. Otherwise start `kind=develop`; append an explicit
    `--profile` only when the user selected one.
 
@@ -57,6 +69,11 @@ checkpoint.
 
 ## Work natively
 
+- After confirmation, build, verify, and perform bounded repair autonomously.
+  Reopen dialogue only for a newly discovered genuine fork. Ask when its answer
+  changes product, architecture, scope, release authority, or another
+  hard-to-reverse choice; otherwise investigate or use a stated reversible
+  assumption.
 - Inspect before editing. Use the host's native planning, tools, delegation,
   and repository workflows rather than recreating them here.
 - When the convergence route fires, synthesize the applicable failure seams
@@ -84,5 +101,6 @@ checkpoint.
 - Complete only after the requested outcome and focused discriminating checks
   are satisfied and no blocking owner decision remains. Completion records
   workflow state, not release authorization or trusted review.
-- Report outcome, evidence, remaining risks, and next action. If blocked,
-  checkpoint and pause instead of retaining an active lease while waiting.
+- Maintain `task.md` and produce `closeout.md` under the lifecycle artifact
+  policy. Generate `adt report` only on demand. If blocked, checkpoint and pause
+  instead of retaining an active lease while waiting.

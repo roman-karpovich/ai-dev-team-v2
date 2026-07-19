@@ -36,6 +36,14 @@ TASK_STATUSES = frozenset({"active", "paused", "completed"})
 CHECKPOINT_KINDS = frozenset(
     {"manual", "pause", "handoff", "drift-accepted", "complete"}
 )
+REPORT_CHECKPOINT_KINDS = (
+    "manual",
+    "pause",
+    "handoff",
+    "drift-accepted",
+    "complete",
+)
+PILOT_RUN_REPORT_VERSION = "adt.pilot-run-report.v0"
 LOWER_HEX = frozenset("0123456789abcdef")
 OCTAL_DIGITS = frozenset("01234567")
 FINGERPRINT_KINDS = frozenset({"file", "symlink", "special"})
@@ -439,6 +447,51 @@ def _inferred_resume_count(task: dict[str, Any]) -> int:
         if was_resumed and not successor_is_drift:
             count += 1
     return count
+
+
+def _report_inferred_resume_count(task: dict[str, Any]) -> int:
+    checkpoints = task["checkpoints"]
+    return sum(
+        checkpoint["kind"] in {"pause", "handoff"}
+        and (index + 1 < len(checkpoints) or task["status"] != "paused")
+        for index, checkpoint in enumerate(checkpoints)
+    )
+
+
+def _pilot_run_report(task: dict[str, Any]) -> dict[str, Any]:
+    checkpoints = task["checkpoints"]
+    checkpoint_counts = {
+        kind: sum(checkpoint["kind"] == kind for checkpoint in checkpoints)
+        for kind in REPORT_CHECKPOINT_KINDS
+    }
+    snapshot = task["snapshot"]
+    changes = snapshot["changes"]
+    return {
+        "report_version": PILOT_RUN_REPORT_VERSION,
+        "task": {
+            "id": task["id"],
+            "kind": task["kind"],
+            "profile": task["profile"],
+            "status": task["status"],
+        },
+        "timestamps": {
+            "created_at": task["created_at"],
+            "updated_at": task["updated_at"],
+            "completed_at": task.get("completed_at"),
+        },
+        "counts": {
+            "checkpoints": checkpoint_counts,
+            "inferred_resumes": _report_inferred_resume_count(task),
+            "takeovers": len(task.get("takeovers", [])),
+        },
+        "persisted_latest_snapshot": {
+            "head": snapshot["head"],
+            "digest": snapshot["digest"],
+            "dirty": snapshot["dirty"],
+            "change_total": changes["total"],
+            "change_truncated": changes["truncated"],
+        },
+    }
 
 
 def _validate_state(value: dict[str, Any], workspace_id: str) -> None:
@@ -1074,6 +1127,64 @@ def _success(
     }
 
 
+def _canonical_report_bytes(report: dict[str, Any]) -> bytes:
+    return (
+        json.dumps(
+            report,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode("utf-8")
+
+
+def _publish_report(output: Path, encoded: bytes) -> None:
+    directory = output.parent
+    descriptor = -1
+    temporary_name: str | None = None
+    replaced = False
+    try:
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{output.name or 'adt-report'}.",
+            suffix=".tmp",
+            dir=directory,
+        )
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "wb") as temporary_file:
+            descriptor = -1
+            temporary_file.write(encoded)
+            temporary_file.flush()
+            os.fsync(temporary_file.fileno())
+        os.replace(temporary_name, output)
+        replaced = True
+        temporary_name = None
+        directory_descriptor = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(directory_descriptor)
+        finally:
+            os.close(directory_descriptor)
+    except OSError as error:
+        message = (
+            "The report output was published, but durable publication could not "
+            "be confirmed."
+            if replaced
+            else "The report output could not be published atomically."
+        )
+        raise CliError(
+            "report_output_unavailable",
+            message,
+            exit_code=4,
+        ) from error
+    finally:
+        if descriptor >= 0:
+            with contextlib.suppress(OSError):
+                os.close(descriptor)
+        if temporary_name is not None:
+            with contextlib.suppress(OSError):
+                os.unlink(temporary_name)
+
+
 def _task_view(task: dict[str, Any], *, include_lease_id: bool) -> dict[str, Any]:
     view = copy.deepcopy(task)
     lease = view.get("lease")
@@ -1190,6 +1301,42 @@ def command_list(workspace: GitWorkspace, store: StateStore) -> dict[str, Any]:
             current_task_id=state_value["current_task_id"],
             tasks=summaries,
         )
+
+
+def command_report(
+    store: StateStore, arguments: argparse.Namespace
+) -> dict[str, Any]:
+    if not store.exists():
+        raise CliError("no_task", "No task state exists in this workspace.")
+    with store.lock(shared=True):
+        state_value = _load_existing(store)
+        if arguments.task is None:
+            task = _current_task(state_value)
+        else:
+            task = next(
+                (
+                    candidate
+                    for candidate in state_value["tasks"]
+                    if candidate["id"] == arguments.task
+                ),
+                None,
+            )
+            if task is None:
+                raise CliError(
+                    "task_unknown",
+                    "The requested task does not exist in this workspace.",
+                    details={"task_id": arguments.task},
+                )
+        report = _pilot_run_report(task)
+
+    result = {"ok": True, "command": "report", "report": report}
+    if arguments.output is not None:
+        _publish_report(
+            Path(arguments.output).expanduser(),
+            _canonical_report_bytes(report),
+        )
+        result["output_written"] = True
+    return result
 
 
 def command_checkpoint(
@@ -1467,6 +1614,10 @@ def build_parser() -> JsonArgumentParser:
     subparsers.add_parser("context")
     subparsers.add_parser("list")
 
+    report = subparsers.add_parser("report")
+    report.add_argument("--task", metavar="TASK_ID")
+    report.add_argument("--output", metavar="FILE")
+
     checkpoint = subparsers.add_parser("checkpoint")
     checkpoint.add_argument("--host", required=True)
     checkpoint.add_argument("--lease", required=True)
@@ -1538,6 +1689,8 @@ def dispatch(arguments: argparse.Namespace) -> dict[str, Any]:
         return command_status(arguments.command, workspace, store)
     if arguments.command == "list":
         return command_list(workspace, store)
+    if arguments.command == "report":
+        return command_report(store, arguments)
     if arguments.command == "checkpoint":
         return command_checkpoint(workspace, store, arguments)
     if arguments.command == "takeover":
@@ -1591,11 +1744,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 130
     except Exception:
-        message = (
-            "The review gate failed before it could produce a verdict."
-            if arguments is not None and arguments.command == "review-gate"
-            else "The command failed before it could update task state."
-        )
+        if arguments is not None and arguments.command == "review-gate":
+            message = "The review gate failed before it could produce a verdict."
+        elif arguments is not None and arguments.command == "report":
+            message = "The report failed before it could be produced."
+        else:
+            message = "The command failed before it could update task state."
         _emit(
             {
                 "ok": False,

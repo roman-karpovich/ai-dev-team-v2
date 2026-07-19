@@ -5,6 +5,9 @@ This guide covers the local `adt` command surface and state lifecycle. Use the
 review and verification policy lives in the plugin references linked by each
 skill; it is intentionally not repeated here.
 
+During normal skill use the agent operates this command surface. The owner
+uses the CLI directly only for optional inspection or recovery.
+
 ## Runtime values
 
 Choose these values before issuing commands:
@@ -41,6 +44,36 @@ adt --workspace "$WORKSPACE" list
 `status` omits goal, checkpoint notes, completion summary, and lease ID.
 `context` includes continuity text but still omits the lease ID. `list` gives a
 workspace task history summary.
+
+Generate a process-analysis report from the current task or retained history:
+
+```bash
+adt --workspace "$WORKSPACE" report
+adt --workspace "$WORKSPACE" report --task "$TASK_ID"
+adt --workspace "$WORKSPACE" report --task "$TASK_ID" --output "$FILE"
+```
+
+The canonical `adt.pilot-run-report.v0` report is a closed, byte-deterministic
+JSON projection containing only:
+
+- task ID, kind, profile, and status;
+- created, updated, and optional completed timestamps;
+- counts for each checkpoint kind, inferred resumes, and takeovers;
+- persisted latest snapshot HEAD, digest, dirty flag, total changes, and
+  truncated changes.
+
+The report is a privacy-minimized projection of persisted task state, not a
+live worktree observation. It omits workspace root and ID, change paths, host
+values, goal, summary, notes, reasons, lease data, and unobserved token, cost,
+model, or review metrics. There is no `--include-text` mode. An unknown task ID
+fails rather than falling back to the current task.
+
+The command holds a shared state lock and does not update the ledger or capture
+a live snapshot. Without `--output`, it writes no artifact. With `--output`, it
+atomically publishes exactly the canonical report plus a final newline; stdout
+still returns a success envelope and never echoes the machine-local output
+path. Writing an output file after a terminal snapshot can itself dirty the
+worktree; the report still describes the persisted latest snapshot.
 
 Record an increment:
 
@@ -112,12 +145,17 @@ local process deliberately reading Git-private state.
 ## Typical lifecycle
 
 1. Run `status` after read-only worktree orientation.
-2. Start a new task or resume the paused task assigned to this host.
-3. Run `context` after resume, takeover, or handoff.
-4. Work natively and checkpoint coherent increments, rotating `LEASE` each
+2. Resolve material decisions and accept conversational confirmation; let the
+   agent maintain `task.md` rather than treating it as an approval form.
+3. Start a new task or resume the paused task assigned to this host.
+4. Run `context` after resume, takeover, or handoff.
+5. Work natively and checkpoint coherent increments, rotating `LEASE` each
    time.
-5. Pause when waiting, hand off when another host should continue, or complete
+6. Pause when waiting, hand off when another host should continue, or complete
    when the task outcome is satisfied.
+7. Produce `closeout.md`, keeping terminal state distinct from review verdict,
+   release recommendation, and publication authority. Generate `adt report`
+   only on demand.
 
 For a standalone cold review, use a separate checkout and follow the direct
 [cold-review reference](https://github.com/roman-karpovich/ai-dev-team-v2/blob/master/plugins/ai-dev-team-v2/references/cold-independent-review.md)
@@ -157,6 +195,12 @@ Inspect the reported expected and actual changes. Resume with
 Do not hand-edit, truncate, or recreate the ledger. Preserve the diagnostic and
 the state path, stop mutations, and repair the underlying file or filesystem
 problem through a separately reviewed recovery action.
+
+### `report_output_unavailable`
+
+The requested report was not safely published, or publication landed but
+directory durability could not be confirmed. Inspect the target without
+assuming that retry is side-effect free; the error never exposes its path.
 
 ### Updated skill is not visible
 
