@@ -41,6 +41,11 @@ CANDIDATE_BINDING_ROUTE = (
     "references/verification-environments.md",
     "before:check-execution|result-interpretation",
 )
+DIALOGUE_REFINEMENT_ROUTE = (
+    "dialogue:owner-correction|design-hypothesis|scope-challenge",
+    "references/convergence-control.md",
+    "before:task-action|candidate-edit|review-launch|worker-dispatch|publish",
+)
 EXPECTED_TASK_STATE_COMMANDS = {
     tuple(shlex.split(command))
     for command in (
@@ -70,6 +75,7 @@ EXPECTED_SKILL_ROUTES = {
             "references/task-lifecycle.md",
             "after:claude-if-triggered;before:adt-state|mutation",
         ),
+        DIALOGUE_REFINEMENT_ROUTE,
         (
             "depends-on:auto-reporting|framework-lifecycle|process-lifecycle|termination|propagation|bootstrap|event-cardinality",
             "references/incident-observability.md",
@@ -113,6 +119,7 @@ EXPECTED_SKILL_ROUTES = {
             "references/task-lifecycle.md",
             "after:prior-preflights;before:adt-state|mutation",
         ),
+        DIALOGUE_REFINEMENT_ROUTE,
         (
             "depends-on:auto-reporting|framework-lifecycle|process-lifecycle|termination|propagation|bootstrap|event-cardinality",
             "references/incident-observability.md",
@@ -530,6 +537,121 @@ class SkillContractTest(unittest.TestCase):
         self.assertIn(
             "One review generation is every counted cold path for one `ReviewKey`; "
             "several reviewers on that candidate still consume one generation.",
+            reference,
+        )
+
+    def test_material_dialogue_refines_contract_without_expanding_authority(self) -> None:
+        reference = " ".join(
+            read(PLUGIN / "references/convergence-control.md").split()
+        )
+
+        self.assertIn(
+            "Classify new material owner dialogue as an `authoritative owner "
+            "correction`, `tentative design hypothesis`, or `scope challenge or "
+            "question`.",
+            reference,
+        )
+        self.assertIn(
+            "An authoritative owner correction supersedes the affected contract "
+            "term immediately after verifying discoverable facts.",
+            reference,
+        )
+        self.assertIn(
+            "A tentative design hypothesis permits only bounded read-only analysis "
+            "until the owner accepts it; do not encode it as a decision.",
+            reference,
+        )
+        self.assertIn(
+            "A scope challenge or question audits the existing claim and is not "
+            "authorization for code, branch, pull-request, or external mutation.",
+            reference,
+        )
+        self.assertIn(
+            "Contract authority and mutation authority are distinct.", reference
+        )
+        self.assertIn(
+            "An authoritative correction changes acceptance but neither grants "
+            "new mutation authority nor erases mutation authority already explicit "
+            "in the active task.",
+            reference,
+        )
+        self.assertIn(
+            "Before replacement or publication, re-check that the action remains "
+            "within that existing authorized scope.",
+            reference,
+        )
+        self.assertIn(
+            "Before task action, freeze incompatible code, review, worker, and "
+            "publish lanes.",
+            reference,
+        )
+
+    def test_material_dialogue_updates_one_effective_contract_and_pauses_on_forks(
+        self,
+    ) -> None:
+        reference = " ".join(
+            read(PLUGIN / "references/convergence-control.md").split()
+        )
+        _, develop = frontmatter(SKILLS / "develop" / "SKILL.md")
+        develop = " ".join(develop.split())
+
+        self.assertIn(
+            "For a material refinement, write one compact self-contained effective "
+            "contract in the working plan: accepted outcome and domain; constraints "
+            "and non-goals; repository policy; resolved `BASE_REF` and immutable "
+            "`BASE_SHA`; verification obligations; open design choices; invalidated "
+            "candidate, evidence, and reviews; and next permitted work.",
+            reference,
+        )
+        self.assertIn(
+            "Only when the change is durable and material to ADT state, checkpoint "
+            "that complete effective contract once; do not emit a chain of "
+            "correction notes.",
+            reference,
+        )
+        self.assertIn(
+            "Pause when an architecture decision remains open.", reference
+        )
+        self.assertIn(
+            "Ordinary clarification needs neither a checkpoint nor a pause.",
+            reference,
+        )
+        self.assertIn(
+            "Checkpoint only a durable, material refinement as one complete "
+            "effective contract; ordinary clarification needs no checkpoint.",
+            develop,
+        )
+        self.assertNotIn("Checkpoint later owner changes", develop)
+
+    def test_refined_contract_rebinds_review_and_repository_base(self) -> None:
+        reference = " ".join(
+            read(PLUGIN / "references/convergence-control.md").split()
+        )
+
+        self.assertIn(
+            "Changing any accepted outcome, domain, constraint, non-goal, repository "
+            "policy, base, or verification obligation changes the contract digest "
+            "and therefore the `ReviewKey`.",
+            reference,
+        )
+        self.assertIn(
+            "Before creating a branch, worktree, or pull request, resolve `BASE_REF` "
+            "and immutable `BASE_SHA` from an explicit authoritative owner decision, "
+            "otherwise repository policy, and only then the remote default branch "
+            "as fallback when neither selects a base.",
+            reference,
+        )
+        self.assertIn(
+            "Never infer the merge target from the current checkout.", reference
+        )
+        self.assertIn(
+            "If a candidate branch is incompatible with the resolved base, "
+            "invalidate it; do not repair the mismatch by retargeting the pull "
+            "request.",
+            reference,
+        )
+        self.assertIn(
+            "The latest effective contract drives both development and review.",
             reference,
         )
 

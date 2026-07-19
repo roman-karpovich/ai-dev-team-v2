@@ -17,6 +17,7 @@ All `references/...` locators below resolve from the installed plugin root.
 | --- | --- | --- |
 | `host:claude` | `references/claude-runtime.md` | `before:repository-exposure\|adt-state\|editing` |
 | `always` | `references/task-lifecycle.md` | `after:claude-if-triggered;before:adt-state\|mutation` |
+| `dialogue:owner-correction\|design-hypothesis\|scope-challenge` | `references/convergence-control.md` | `before:task-action\|candidate-edit\|review-launch\|worker-dispatch\|publish` |
 | `depends-on:auto-reporting\|framework-lifecycle\|process-lifecycle\|termination\|propagation\|bootstrap\|event-cardinality` | `references/incident-observability.md` | `before:task-contract\|candidate-edit` |
 | `acceptance:input-domain\|upstream-replacement:removed,deprecated,unavailable->local-derivation` | `references/semantic-boundaries.md` | `before:task-contract` |
 | `risk:stateful-ingestion\|replay-cursor\|transactions-concurrency\|migrations-mixed-versions\|retention-rebuild-rollback\|malformed-failure\|production-query-bounds\|operational-prerequisites\|repair:material-hold\|plugin-card-interleave` | `references/convergence-control.md` | `before:candidate-edit\|repair-restart\|plugin-install` |
@@ -25,6 +26,9 @@ All `references/...` locators below resolve from the installed plugin root.
 
 `|` joins alternatives or boundary members; `;` sequences boundaries from
 left to right.
+
+When the dialogue route fires, stop incompatible work and refine the working
+plan under the convergence reference before resuming task action.
 
 ## Establish the task
 
@@ -47,9 +51,9 @@ left to right.
 
 On resume, takeover, or same-lineage handoff, use `context` for orientation but
 re-check load-bearing conclusions. Do not re-form the durable contract unless
-drift or new evidence invalidates it. Checkpoint later owner changes with the
-authoritative owner, superseded decision, old and new values when known, and
-remaining open decisions.
+drift or new evidence invalidates it. Checkpoint only a durable, material
+refinement as one complete effective contract; ordinary clarification needs no
+checkpoint.
 
 ## Work natively
 

@@ -21,6 +21,44 @@ Keep the synthesis in the working plan unless a durable decision already
 belongs in normal repository documentation or a checkpoint. Do not require a
 durable ledger or this synthesis for every small task.
 
+## Refine the effective contract from dialogue
+
+Classify new material owner dialogue as an `authoritative owner correction`,
+`tentative design hypothesis`, or `scope challenge or question`. Before task
+action, freeze incompatible code, review, worker, and publish lanes.
+
+- An authoritative owner correction supersedes the affected contract term
+  immediately after verifying discoverable facts.
+- A tentative design hypothesis permits only bounded read-only analysis until
+  the owner accepts it; do not encode it as a decision.
+- A scope challenge or question audits the existing claim and is not
+  authorization for code, branch, pull-request, or external mutation.
+
+Contract authority and mutation authority are distinct. An authoritative
+correction changes acceptance but neither grants new mutation authority nor
+erases mutation authority already explicit in the active task. Before
+replacement or publication, re-check that the action remains within that
+existing authorized scope.
+
+For a material refinement, write one compact self-contained effective contract
+in the working plan: accepted outcome and domain; constraints and non-goals;
+repository policy; resolved `BASE_REF` and immutable `BASE_SHA`; verification
+obligations; open design choices; invalidated candidate, evidence, and reviews;
+and next permitted work. Only when the change is durable and material to ADT
+state, checkpoint that complete effective contract once; do not emit a chain
+of correction notes. Pause when an architecture decision remains open.
+Ordinary clarification needs neither a checkpoint nor a pause.
+
+Changing any accepted outcome, domain, constraint, non-goal, repository policy,
+base, or verification obligation changes the contract digest and therefore the
+`ReviewKey`. Before creating a branch, worktree, or pull request, resolve
+`BASE_REF` and immutable `BASE_SHA` from an explicit authoritative owner
+decision, otherwise repository policy, and only then the remote default branch
+as fallback when neither selects a base. Never infer the merge target from the
+current checkout. If a candidate branch is incompatible with the resolved base,
+invalidate it; do not repair the mismatch by retargeting the pull request. The
+latest effective contract drives both development and review.
+
 ## Bind candidates, purposes, and generations
 
 `ArtifactKey` is repository identity + immutable `BASE` + immutable `HEAD` +
