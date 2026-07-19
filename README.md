@@ -12,7 +12,7 @@ handoffs durable while leaving coding and review judgment to the active host.
 
 ## Status
 
-`v0.1.52` is the first experimental supervised-autonomy prerelease. It is ready
+`v0.1.53` is the current experimental supervised-autonomy prerelease. It is ready
 for dogfood on real repositories with an owner available for genuine product,
 architecture, scope, or release-authority forks.
 
@@ -49,13 +49,13 @@ The installer registers a local marketplace and links `~/.local/bin/adt` to the
 selected checkout. Install from a permanent directory: moving or deleting that
 checkout breaks the CLI and invalidates the marketplace source.
 
-## Install v0.1.52
+## Install v0.1.53
 
 Clone the release into a durable location:
 
 ```bash
 mkdir -p "$HOME/src"
-git clone --branch v0.1.52 --depth 1 \
+git clone --branch v0.1.53 --depth 1 \
   https://github.com/roman-karpovich/ai-dev-team-v2.git \
   "$HOME/src/ai-dev-team-v2"
 cd "$HOME/src/ai-dev-team-v2"

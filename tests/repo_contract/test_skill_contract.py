@@ -194,6 +194,12 @@ QUIESCENT_COLD_BOUNDARIES = {
         "launch:defer",
     ),
     (
+        "sealed-artifact-output-isolation",
+        "before:counted-cold-launch",
+        "sealed-artifact:reviewer-owned;destinations:absolute;launcher-output-if-present:distinct-canonical-target",
+        "launch:defer",
+    ),
+    (
         "sealed-conclusion-embargo",
         "from:launch;until:conclusion-sealed",
         "forbid:spawn-agent,send-message,follow-up,interrupt;wait:terminal-result",
@@ -1023,6 +1029,30 @@ class SkillContractTest(unittest.TestCase):
             "Record unresolved domain membership as a terminal gap or `HOLD` "
             "without contacting the owner or launcher.",
             semantic,
+        )
+
+    def test_counted_reviewer_separates_sealed_report_from_launcher_output(self) -> None:
+        reference = " ".join(
+            read(PLUGIN / "references/cold-independent-review.md").split()
+        )
+
+        self.assertIn(
+            "Before launch, require it and every launcher-owned final-message or "
+            "transcript destination to be absolute.",
+            reference,
+        )
+        self.assertIn(
+            "Resolve each destination to its canonical target.",
+            reference,
+        )
+        self.assertIn(
+            "If a destination such as Codex `-o` names the sealed artifact target, "
+            "or any target identity cannot be established, defer the launch.",
+            reference,
+        )
+        self.assertIn(
+            "Never route launcher output to the sealed artifact destination.",
+            reference,
         )
 
     def test_outbound_contact_self_aborts_without_waiting_for_a_reply(self) -> None:

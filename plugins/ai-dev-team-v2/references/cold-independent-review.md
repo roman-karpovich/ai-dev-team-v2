@@ -49,9 +49,17 @@ repair.
 | Boundary | Trigger | Required | On unmet |
 | --- | --- | --- | --- |
 | `quiescent-counted-path` | `before:counted-cold-launch` | `other-child-agents:terminal;counted-reviewers:one-at-a-time;reviewer-handle:hidden-from-other-agents` | `launch:defer` |
+| `sealed-artifact-output-isolation` | `before:counted-cold-launch` | `sealed-artifact:reviewer-owned;destinations:absolute;launcher-output-if-present:distinct-canonical-target` | `launch:defer` |
 | `sealed-conclusion-embargo` | `from:launch;until:conclusion-sealed` | `forbid:spawn-agent,send-message,follow-up,interrupt;wait:terminal-result` | `path:independence-compromised;conclusion:do-not-count` |
 | `unsolicited-cross-agent-contact` | `message:cross-agent-unsolicited` | `stop:review` | `path:independence-compromised;conclusion:do-not-count` |
 | `outbound-cross-agent-contact` | `action:cross-agent-question-or-message` | `stop:review;reply:do-not-wait-or-read;state:complete-if-owned;return:terminal` | `path:independence-compromised;conclusion:do-not-count` |
+
+The sealed artifact destination is reviewer-owned. Before launch, require it and
+every launcher-owned final-message or transcript destination to be absolute.
+Resolve each destination to its canonical target. If a destination such as
+Codex `-o` names the sealed artifact target, or any target identity cannot be
+established, defer the launch. Never route launcher output to the sealed
+artifact destination.
 
 The launcher may remain active only to wait for and receive the terminal result.
 If the host cannot prevent an unsolicited child-to-reviewer message with this
