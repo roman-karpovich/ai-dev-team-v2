@@ -114,6 +114,34 @@ class RepositoryContractTest(unittest.TestCase):
             "local", codex_marketplace["plugins"][0]["source"]["source"]
         )
 
+    def test_readme_is_a_release_user_guide(self) -> None:
+        readme = (ROOT / "README.md").read_text()
+        claude = json.loads(
+            (ROOT / "plugins/ai-dev-team-v2/.claude-plugin/plugin.json").read_text()
+        )
+
+        for required in (
+            f"git clone --branch v{claude['version']}",
+            "make mvp-install",
+            "make mvp-install-codex",
+            "make mvp-install-claude",
+            "make mvp-replace-v1",
+            "$ai-dev-team:develop",
+            "/ai-dev-team:develop",
+            "$ai-dev-team:review",
+            "/ai-dev-team:review",
+            "grill me",
+            "task.md",
+            "closeout.md",
+            "adt report",
+            "Start a new Codex task or Claude session",
+            "not a production VERIFY engine",
+        ):
+            with self.subTest(required=required):
+                self.assertIn(required, readme)
+
+        self.assertNotIn("pre-implementation readiness phase", readme)
+
 
 if __name__ == "__main__":
     unittest.main()

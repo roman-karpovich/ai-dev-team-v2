@@ -6,16 +6,17 @@ and review requests do not activate it.
 
 ## Install
 
-From this repository checkout, install both hosts or one host:
+Install from a permanent repository checkout. Choose exactly one target:
 
 ```bash
-make mvp-install
-make mvp-install-codex
-make mvp-install-claude
+make mvp-install-codex   # Codex only
+make mvp-install-claude  # Claude only
+make mvp-install         # both CLIs must be installed
 ```
 
 Ensure `~/.local/bin` is on `PATH`, then start a fresh host session so it loads
-the installed plugin.
+the installed plugin. Keep the checkout at the same path: the local marketplace
+and `adt` symlink are bound to it.
 
 ## Develop
 
