@@ -51,6 +51,9 @@ EXPECTED_TASK_STATE_COMMANDS = {
     for command in (
         'adt --workspace "$WORKSPACE" status',
         'adt --workspace "$WORKSPACE" list',
+        'adt --workspace "$WORKSPACE" report',
+        'adt --workspace "$WORKSPACE" report --task "$TASK_ID"',
+        'adt --workspace "$WORKSPACE" report --task "$TASK_ID" --output "$FILE"',
         'adt --workspace "$WORKSPACE" start --host "$HOST" --kind develop --goal "$GOAL"',
         'adt --workspace "$WORKSPACE" start --host "$HOST" --kind review --goal "$GOAL"',
         'adt --workspace "$WORKSPACE" resume --host "$HOST"',
@@ -622,6 +625,109 @@ class SkillContractTest(unittest.TestCase):
             develop,
         )
         self.assertNotIn("Checkpoint later owner changes", develop)
+
+    def test_develop_grill_is_bounded_material_and_conversational(self) -> None:
+        _, develop = frontmatter(SKILLS / "develop" / "SKILL.md")
+        develop = " ".join(develop.split())
+
+        for requirement in (
+            "For every nontrivial task, ensure a bounded `grill me` dialogue has "
+            "occurred before candidate edits.",
+            "Count material questions and decisions already resolved in the current "
+            "conversation; do not repeat them.",
+            "Investigate repository context before asking questions.",
+            "State the task's essence, surface contentious assumptions, risks, and "
+            "genuine forks, then ask one coherent bounded batch of remaining material "
+            "questions.",
+            "Do not ask investigable or routine questions.",
+            "If the owner explicitly says `grill me`, deepen the pass even when the "
+            "task initially appears specified.",
+            "Skip the grill for an explicit small, reversible task unless the owner "
+            "requests it.",
+            "Treat `да`, `го`, `так`, or equivalent plain-language agreement as "
+            "confirmation.",
+            "`task.md` is your synthesis and decision log, not an approval form.",
+            "After confirmation, build, verify, and perform bounded repair "
+            "autonomously.",
+            "Reopen dialogue only for a newly discovered genuine fork.",
+        ):
+            self.assertIn(requirement, develop)
+
+    def test_minimal_artifacts_and_private_report_are_one_shared_policy(self) -> None:
+        lifecycle = " ".join(read(LIFECYCLE).split())
+        operations = " ".join(
+            read(ROOT / "docs/mvp-operations.md").split()
+        )
+
+        for requirement in (
+            "During normal skill use, the agent runs lifecycle commands; do not ask "
+            "the owner to operate the CLI.",
+            "Treat plain-text replies in the same task as answers, corrections, or "
+            "confirmation without requiring another skill invocation.",
+            "`task.md` contains the current effective specification and an append-only "
+            "log of material decisions.",
+            "`closeout.md` records outcome, exact artifact references, regression "
+            "coverage and evidence, independent-review state, risks and rollout, "
+            "links, and one next action.",
+            "Do not archive raw red and green logs by default.",
+            "Create ADRs, runbooks, migration notes, review notes, or reproduction "
+            "notes only when the knowledge is independently durable; link them "
+            "instead of duplicating them.",
+            "Never invent a cross-repository write.",
+            "provide a copy-ready `task.md` and `closeout.md` bundle and ask one "
+            "focused routing question before a tracked write",
+            "A counted cold work order must provide its sealed artifact destination; "
+            "if it does not, return a terminal gap or `HOLD` without contact or a "
+            "tracked write.",
+        ):
+            self.assertIn(requirement, lifecycle)
+
+        _, review = frontmatter(SKILLS / "review" / "SKILL.md")
+        review = " ".join(review.split())
+        self.assertIn(
+            "Require the fixed work order to name the sealed artifact destination. "
+            "If it does not, return a terminal gap or `HOLD` without contact or a "
+            "tracked write.",
+            review,
+        )
+
+        self.assertIn(
+            "The report is a privacy-minimized projection of persisted task state, "
+            "not a live worktree observation.",
+            operations,
+        )
+        self.assertIn(
+            "Writing an output file after a terminal snapshot can itself dirty the "
+            "worktree; the report still describes the persisted latest snapshot.",
+            operations,
+        )
+        self.assertIn("There is no `--include-text` mode.", operations)
+
+    def test_quickstart_documents_compact_input_and_autonomous_protocol(self) -> None:
+        usage = " ".join(read(ROOT / "docs/mvp-usage.md").split())
+
+        for field in (
+            "`Outcome`",
+            "`Constraints`",
+            "`Done`",
+            "`Artifact target`",
+            "`Publication authority`",
+        ):
+            self.assertIn(field, usage)
+        self.assertIn(
+            "ORIENT -> discuss material decisions -> conversational confirmation -> "
+            "autonomous BUILD / VERIFY / bounded REPAIR -> CLOSEOUT + KB",
+            usage,
+        )
+        self.assertIn(
+            "The owner does not need to line-review `task.md` as an approval form.",
+            usage,
+        )
+        self.assertIn(
+            "Ask again only when new evidence reveals a genuine fork in product, "
+            "architecture, scope, release authority, or another hard-to-reverse choice.",
+            usage,
+        )
 
     def test_refined_contract_rebinds_review_and_repository_base(self) -> None:
         reference = " ".join(

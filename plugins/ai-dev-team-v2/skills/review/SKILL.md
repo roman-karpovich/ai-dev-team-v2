@@ -44,8 +44,16 @@ plan under the convergence reference before resuming task action.
    input domain and non-goals, authoritative owner decisions, and the exact
    `$BASE..$HEAD` scope. Exclude prior findings, suspected locations,
    severities, proposed fixes, and expected conclusions.
+   Outside a counted cold path, investigate routine uncertainty, present a
+   compact decision brief for material scope choices, and accept ordinary
+   plain-language confirmation. Ask again only for a newly discovered genuine
+   product, architecture, scope, release-authority, or hard-to-reverse fork.
+   Inside a counted cold path, the fixed work order and contact boundary replace
+   owner dialogue.
 4. For each counted cold path, use a distinct checkout, fresh inference
    context, standalone path-specific `kind=review` state, and sealed output.
+   Require the fixed work order to name the sealed artifact destination. If it
+   does not, return a terminal gap or `HOLD` without contact or a tracked write.
    Declare its purpose and `ReviewKey` first; a diagnostic path is not final
    acceptance, and a final path must be eligible before it launches.
    A counted reviewer owns exactly one path and returns one sealed
@@ -98,3 +106,7 @@ later work there is repair validation, never a fresh cold path. Preserve
   it and pause or hand it back; do not complete the development task. A
   standalone review task may complete after its sealed report is fixed,
   including a `HOLD` report. Completion is not release authorization.
+- Maintain the neutral effective specification in `task.md` and put the fixed
+  findings-first outcome in `closeout.md` under the lifecycle artifact policy.
+  Generate `adt report` only on demand; keep terminal status, review verdict,
+  release recommendation, and publication authority distinct.
