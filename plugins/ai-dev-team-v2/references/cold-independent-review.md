@@ -33,7 +33,7 @@ when the applicable assurance profile explicitly needs it. Current
 version-qualified launcher forms live in the operator guide, not here. Do
 not change global memory configuration for a one-off review. If an
 equivalent clean launch is impossible, continue only after the user accepts
-that the result is non-independent.
+that the result is non-independent and that the path does not count.
 
 ## Isolate the path
 

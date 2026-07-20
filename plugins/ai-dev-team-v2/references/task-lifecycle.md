@@ -6,7 +6,8 @@ after any required cold-review and host-runtime preflight.
 ## Bind state truthfully
 
 - Require `adt` on `PATH`; otherwise stop, request MVP installation, and use a
-  fresh host session. Never simulate state.
+  fresh host session. Inside a counted cold path, record a terminal gap
+  instead of requesting installation. Never simulate state.
 - During normal skill use, the agent runs lifecycle commands; do not ask the
   owner to operate the CLI.
 - Treat plain-text replies in the same task as answers, corrections, or
@@ -30,14 +31,18 @@ approval. Read `context` after resume, takeover, or handoff and treat it as
 continuity, not proof.
 
 Use handoff to pause and reserve a task for another host in the same task
-lineage. If this host still owns an active task but its session and lease were
+lineage. Before a cross-host handoff, verify that both hosts run the same
+installed plugin release, and continue only in a fresh target-host session.
+If this host still owns an active task but its session and lease were
 lost, obtain explicit approval for same-host takeover and record the reason.
 Takeover cannot seize another host's task.
 
 Checkpoint a coherent increment before pausing or handing off. Pause rather
 than retain an active lease while waiting. Complete only when that task's
 closeout rules are satisfied. Completion closes workflow state; it is never a
-release recommendation or authorization.
+release recommendation or authorization. End a completing or pausing turn
+with one owner-facing summary: the outcome first, then artifacts, checks and
+gaps, independent-review state, residual risk, and the next action.
 
 ## Keep durable artifacts minimal
 

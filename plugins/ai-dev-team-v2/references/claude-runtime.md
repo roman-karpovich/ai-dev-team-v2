@@ -39,6 +39,12 @@ claude --model claude-opus-4-8
 claude --model claude-fable-5
 ```
 
+## Communicate deliberately
+
+Outside counted no-contact paths, do not narrate routine tool use.
+Communicate material decisions, blockers, requested status, and the final
+owner-facing summary.
+
 ## Record identity honestly
 
 After conclusions are fixed, record the actual model and any visible switch or

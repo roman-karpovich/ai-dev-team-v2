@@ -26,8 +26,8 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Use $ai-dev-team:develop to turn this goal into a resumable implementation.",
-      "Use $ai-dev-team:review to inspect this change against its intent and evidence."
+      "Use $ai-dev-team:develop to turn this goal into a controlled, resumable implementation.",
+      "Use $ai-dev-team:review to inspect this change against its accepted intent and evidence."
     ]
   }
 }

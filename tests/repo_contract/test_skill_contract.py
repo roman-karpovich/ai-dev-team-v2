@@ -39,19 +39,45 @@ REPOSITORY_BLOB_ROOT = (
     "https://github.com/roman-karpovich/ai-dev-team-v2/blob/master/"
 )
 CANDIDATE_BINDING_ROUTE = (
-    "check:executes-source|artifact|runtime",
+    "Any check executes source, an artifact, or a runtime.",
     "references/verification-environments.md",
-    "before:check-execution|result-interpretation",
+    "Before executing the check and before interpreting its result.",
 )
 DIALOGUE_REFINEMENT_ROUTE = (
-    "dialogue:owner-correction|design-hypothesis|scope-challenge",
+    "New material owner dialogue arrives: an authoritative correction, a "
+    "tentative design hypothesis, or a scope challenge or question.",
     "references/convergence-control.md",
-    "before:task-action|candidate-edit|review-launch|worker-dispatch|publish",
+    "Before further task action, candidate edits, review launch, worker "
+    "dispatch, or publication.",
+)
+INCIDENT_ROUTE_CONDITION = (
+    "The requested outcome or a reported or discovered symptom may depend on "
+    "automatic reporting, framework or process lifecycle, termination or "
+    "propagation, bootstrap, or event cardinality."
+)
+SEMANTIC_ROUTE_CONDITION = (
+    "Acceptance turns on an input-domain boundary, or a removed, deprecated, "
+    "or unavailable upstream value is replaced by a local derivation."
+)
+RISK_ROUTE_CONDITION = (
+    "The change touches stateful ingestion, replay or cursor behavior, "
+    "transactions or concurrency, migrations or mixed versions, retention, "
+    "rebuild or rollback, malformed or failure behavior, production query "
+    "bounds, or operational prerequisites, or carries comparable "
+    "state-integrity, ordering, recovery, boundedness, or rollout risk; a "
+    "repair follows a material `HOLD`; or plugin and card work interleave."
+)
+VERIFICATION_SELECTION_ROUTE = (
+    "A required check needs an unavailable dependency, runtime, production "
+    "bootstrap, or load-bearing environment equivalence.",
+    "references/verification-environments.md",
+    "Before selecting the verification approach.",
 )
 PUBLICATION_GATE_ROUTE = (
-    "publication:commit-metadata|tag-metadata|branch-name|github-metadata|public-prose|ci-summary",
+    "The write publishes commit metadata, tag metadata, a branch name, "
+    "GitHub metadata, public prose, or a CI summary.",
     "references/publication-boundary.md",
-    "immediately-before:persistent-write",
+    "Immediately before the persistent write.",
 )
 EXPECTED_TASK_STATE_COMMANDS = {
     tuple(shlex.split(command))
@@ -76,78 +102,77 @@ EXPECTED_TASK_STATE_COMMANDS = {
 EXPECTED_SKILL_ROUTES = {
     "develop": [
         (
-            "host:claude",
+            "The active host is Claude Code.",
             "references/claude-runtime.md",
-            "before:repository-exposure|adt-state|editing",
+            "Before repository or artifact exposure, ADT state, or editing.",
         ),
         (
-            "always",
+            "Always.",
             "references/task-lifecycle.md",
-            "after:claude-if-triggered;before:adt-state|mutation",
+            "After the Claude runtime reference when that applied; before any "
+            "ADT state read or mutation.",
         ),
         PUBLICATION_GATE_ROUTE,
         DIALOGUE_REFINEMENT_ROUTE,
         (
-            "depends-on:auto-reporting|framework-lifecycle|process-lifecycle|termination|propagation|bootstrap|event-cardinality",
+            INCIDENT_ROUTE_CONDITION,
             "references/incident-observability.md",
-            "before:task-contract|candidate-edit",
+            "Before forming the task contract or editing a candidate.",
         ),
         (
-            "acceptance:input-domain|upstream-replacement:removed,deprecated,unavailable->local-derivation",
+            SEMANTIC_ROUTE_CONDITION,
             "references/semantic-boundaries.md",
-            "before:task-contract",
+            "Before forming the task contract.",
         ),
         (
-            "risk:stateful-ingestion|replay-cursor|transactions-concurrency|migrations-mixed-versions|retention-rebuild-rollback|malformed-failure|production-query-bounds|operational-prerequisites|repair:material-hold|plugin-card-interleave",
+            RISK_ROUTE_CONDITION,
             "references/convergence-control.md",
-            "before:candidate-edit|repair-restart|plugin-install",
+            "Before candidate edits, a repair restart, or a plugin install.",
         ),
         CANDIDATE_BINDING_ROUTE,
-        (
-            "verification:unavailable-dependency|runtime|production-bootstrap|environment-equivalence",
-            "references/verification-environments.md",
-            "before:verification-selection",
-        ),
+        VERIFICATION_SELECTION_ROUTE,
     ],
     "review": [
         (
-            "request:cold|independent|two-model",
+            "The review is explicitly requested as cold, independent, or "
+            "two-model.",
             "references/cold-independent-review.md",
-            "before:artifact-inspection|repository-context|adt-state",
+            "First — before artifact inspection, repository context, or ADT "
+            "state.",
         ),
         (
-            "request:cold|independent|two-model|repair:material-hold|evidence:reuse",
+            "The review is cold, independent, or two-model; a repair follows "
+            "a material `HOLD`; or verification evidence may be reused.",
             "references/convergence-control.md",
-            "after:cold-preflight-if-triggered;before:review-key|check-selection|counted-cold-launch",
+            "After the cold preflight when that applied; before fixing the "
+            "`ReviewKey`, selecting checks, or launching a counted cold path.",
         ),
         (
-            "host:claude",
+            "The active host is Claude Code.",
             "references/claude-runtime.md",
-            "after:cold-if-triggered;before:repository-exposure|adt-state|artifact-inspection",
+            "After the cold preflight when that applied; before repository or "
+            "artifact exposure or ADT state.",
         ),
         (
-            "always",
+            "Always.",
             "references/task-lifecycle.md",
-            "after:prior-preflights;before:adt-state|mutation",
+            "After the applicable preflights above; before any ADT state read "
+            "or mutation.",
         ),
         PUBLICATION_GATE_ROUTE,
         DIALOGUE_REFINEMENT_ROUTE,
         (
-            "depends-on:auto-reporting|framework-lifecycle|process-lifecycle|termination|propagation|bootstrap|event-cardinality",
+            INCIDENT_ROUTE_CONDITION,
             "references/incident-observability.md",
-            "before:claim-artifact-inspection",
+            "Before inspecting the artifact for an affected claim.",
         ),
         (
-            "acceptance:input-domain|upstream-replacement:removed,deprecated,unavailable->local-derivation",
+            SEMANTIC_ROUTE_CONDITION,
             "references/semantic-boundaries.md",
-            "before:claim-judgment",
+            "Before judging the affected claim.",
         ),
         CANDIDATE_BINDING_ROUTE,
-        (
-            "verification:unavailable-dependency|runtime|production-bootstrap|environment-equivalence",
-            "references/verification-environments.md",
-            "before:verification-selection",
-        ),
+        VERIFICATION_SELECTION_ROUTE,
     ],
 }
 REQUIRED_SPECIALIST_BOUNDARIES = {
@@ -315,7 +340,7 @@ def markdown_table_rows(text: str, header: str) -> list[tuple[str, ...]]:
 
 
 def skill_route_rows(text: str) -> list[tuple[str, ...]]:
-    return markdown_table_rows(text, "| Trigger | Resource | Boundary |")
+    return markdown_table_rows(text, "| When | Resource | Read it |")
 
 
 def policy_boundary_rows(text: str) -> set[tuple[str, ...]]:
@@ -852,8 +877,9 @@ class SkillContractTest(unittest.TestCase):
             "A final-acceptance cold path is eligible ex ante only when its "
             "artifact is immutable and clean, contract and accepted domain are "
             "fixed, focused checks are current for its `ArtifactKey`, "
-            "adversarial integration is done, known blockers, evidence gaps, "
-            "and owner decisions are closed, and no edit lane is active or planned.",
+            "any declared adversarial-integration path has completed, known "
+            "blockers, evidence gaps, and owner decisions are closed, and no "
+            "edit lane is active or planned.",
             reference,
         )
         self.assertIn(
@@ -877,9 +903,9 @@ class SkillContractTest(unittest.TestCase):
             reference,
         )
         self.assertIn(
-            "A third material `HOLD` requires a scope split, architecture change, "
-            "explicit owner decision, or documented rationale that continuing is "
-            "cheaper and safer.",
+            "A third or later material `HOLD` requires an explicit owner "
+            "decision: a scope split, an architecture change, or an "
+            "owner-accepted rationale that continuing is cheaper and safer.",
             reference,
         )
         self.assertIn(
@@ -907,7 +933,13 @@ class SkillContractTest(unittest.TestCase):
             "environment, database and container identity.",
             reference,
         )
-        self.assertIn("Never rerun a successful exact identity.", reference)
+        self.assertIn(
+            "Do not rerun a successful exact identity merely for reassurance; "
+            "rerun it when the owner requests a rerun or a named flakiness, "
+            "nondeterminism, or freshness hypothesis puts the prior result in "
+            "question.",
+            reference,
+        )
         self.assertIn(
             "After a candidate change, run the smallest affected check and one "
             "proportionate final full gate.",
@@ -1319,6 +1351,109 @@ class SkillContractTest(unittest.TestCase):
             "Do not frame the goal as attacking the artifact or include "
             "suspected weaknesses, payload ideas, exploit paths, or expected "
             "findings.",
+            cold,
+        )
+
+    def test_delegation_narration_and_cross_host_metadata_guidance(self) -> None:
+        _, develop = frontmatter(SKILLS / "develop" / "SKILL.md")
+        develop = " ".join(develop.split())
+        lifecycle = " ".join(read(LIFECYCLE).split())
+        runtime = " ".join(
+            read(PLUGIN / "references/claude-runtime.md").split()
+        )
+        convergence = " ".join(
+            read(PLUGIN / "references/convergence-control.md").split()
+        )
+        incident = " ".join(
+            read(PLUGIN / "references/incident-observability.md").split()
+        )
+        review_yaml = read(SKILLS / "review" / "agents/openai.yaml")
+        codex_manifest = read(PLUGIN / ".codex-plugin/plugin.json")
+
+        self.assertIn(
+            "When two or more independent bounded seams can proceed without "
+            "shared mutation and coordination is cheaper than serial work, use "
+            "native parallel delegation; keep tightly coupled edits with one "
+            "integrator. Do not treat fan-out as independent review.",
+            develop,
+        )
+        self.assertIn(
+            "keep the development task open but paused while fresh standalone "
+            "cold paths run in separate checkouts; do not complete it before "
+            "post-embargo adjudication",
+            develop,
+        )
+        self.assertIn(
+            "Inside a counted cold path, record a terminal gap instead of "
+            "requesting installation.",
+            lifecycle,
+        )
+        self.assertIn(
+            "Before a cross-host handoff, verify that both hosts run the same "
+            "installed plugin release, and continue only in a fresh "
+            "target-host session.",
+            lifecycle,
+        )
+        self.assertIn(
+            "End a completing or pausing turn with one owner-facing summary: "
+            "the outcome first, then artifacts, checks and gaps, "
+            "independent-review state, residual risk, and the next action.",
+            lifecycle,
+        )
+        self.assertIn(
+            "Outside counted no-contact paths, do not narrate routine tool "
+            "use. Communicate material decisions, blockers, requested status, "
+            "and the final owner-facing summary.",
+            runtime,
+        )
+        self.assertIn(
+            "Treat comparable state-integrity, ordering, recovery, "
+            "boundedness, or rollout risk the same way.",
+            convergence,
+        )
+        self.assertIn("owner-selected two-model requirement", convergence)
+        self.assertIn(
+            "one sealed path is never trusted acceptance by itself", convergence
+        )
+        self.assertIn(
+            "a reported or discovered symptom may depend on automatic "
+            "reporting",
+            incident,
+        )
+        self.assertIn("Run a controlled evidence-based review", review_yaml)
+        self.assertNotIn("independent evidence-based review", review_yaml)
+        self.assertIn(
+            "controlled, resumable implementation", codex_manifest
+        )
+        self.assertIn("accepted intent and evidence", codex_manifest)
+
+    def test_review_scope_and_provenance_guards(self) -> None:
+        _, review = frontmatter(SKILLS / "review" / "SKILL.md")
+        review = " ".join(review.split())
+        cold = " ".join(
+            read(PLUGIN / "references/cold-independent-review.md").split()
+        )
+
+        self.assertIn(
+            "Verify that `BASE` is an ancestor of `HEAD`; otherwise proceed "
+            "only on an explicitly owner-selected endpoint comparison and "
+            "record that choice.",
+            review,
+        )
+        self.assertIn(
+            "For a fresh, uninformed review, exclude prior findings, "
+            "suspected locations, severities, proposed fixes, and expected "
+            "conclusions.",
+            review,
+        )
+        self.assertIn(
+            "Informed repair validation within an existing lineage instead "
+            "includes the specific finding under validation; it is never a "
+            "fresh cold path.",
+            review,
+        )
+        self.assertIn(
+            "the result is non-independent and that the path does not count",
             cold,
         )
 
