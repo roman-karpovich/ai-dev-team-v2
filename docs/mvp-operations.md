@@ -181,6 +181,53 @@ before artifact or state exposure. For environment-specific verification, use
 the reference selected conditionally by the active skill rather than adding
 operational ceremony here.
 
+## Counted cold-path launch profiles
+
+The cold-review reference defines counted-path launch requirements as
+properties: a new, non-resumed inference context, no injected memory or prior
+result, and version-validated launch controls. The forms below satisfied
+those properties on the named versions; verify them against the installed CLI
+before counting a path, and treat any unlisted or newer version as
+unverified.
+
+Codex 0.144.3:
+
+```bash
+codex \
+  --strict-config \
+  -c 'memories.use_memories=false' \
+  -c 'memories.generate_memories=false' \
+  exec --ephemeral \
+  --sandbox read-only \
+  "$NEUTRAL_WORK_ORDER"
+```
+
+`--strict-config` requests strict validation of `-c` overrides so that a
+renamed or removed memory key fails at session launch instead of silently
+loading memories; the rejection happens at launch, not on `--version` or
+`doctor`, so confirm it on the installed version. `codex exec` is
+noninteractive but fully agentic. Confirm plugin availability in this mode
+before counting the path; `--ephemeral` does not by itself exclude
+candidate-modified instruction files from the checkout.
+
+Claude Code 2.1.215, one-shot form; `--no-session-persistence` only works
+with `--print`:
+
+```bash
+CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 \
+claude --bare --print --no-session-persistence \
+  --plugin-dir "$TRUSTED_PLUGIN_DIR" \
+  "$NEUTRAL_WORK_ORDER"
+```
+
+`--print` removes interactive user turns, not agentic tool use. `--bare`
+skips automatic plugin sync, hooks, and auto memory; load the plugin
+explicitly with `--plugin-dir` and authenticate with an API key. There is no
+supported interactive zero-persistence form: an interactive
+`claude --bare --plugin-dir "$TRUSTED_PLUGIN_DIR"` session starts
+inbound-clean but persists its own new transcript, so count it only under a
+profile that requires a fresh context rather than zero persistence.
+
 ## Troubleshooting
 
 ### `adt` is not found
@@ -224,3 +271,12 @@ assuming that retry is side-effect free; the error never exposes its path.
 
 Reinstall the plugin and open a new host session. Existing sessions may retain
 already-loaded skill content.
+
+### Model selection is rejected as invalid
+
+Model eligibility can depend on the organization's data policy and retention
+configuration. As of 2026-07, `claude-fable-5` requires 30-day data retention
+and is unavailable under zero-data-retention; an ineligible selection can
+surface as a bare invalid-request error. If a previously working invocation
+starts failing with no obvious request problem, check organization
+eligibility and retention configuration before debugging the command line.

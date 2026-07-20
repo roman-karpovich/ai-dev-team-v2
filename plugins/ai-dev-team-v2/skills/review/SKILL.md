@@ -45,6 +45,10 @@ plan under the convergence reference before resuming task action.
    input domain and non-goals, authoritative owner decisions, and the exact
    `$BASE..$HEAD` scope. Exclude prior findings, suspected locations,
    severities, proposed fixes, and expected conclusions.
+   When the review carries a material security or data-assurance obligation,
+   state the applicable properties as invariants in the acceptance criteria
+   and put evidence-generation limits in the constraints; do not frame the
+   goal as attacking the artifact.
    Outside a counted cold path, investigate routine uncertainty, present a
    compact decision brief for material scope choices, and accept ordinary
    plain-language confirmation. Ask again only for a newly discovered genuine
@@ -81,13 +85,35 @@ later work there is repair validation, never a fresh cold path. Preserve
 - Review correctness, failure behavior, security and data risk, compatibility,
   architectural fit, and maintainability in proportion to the change. Check
   whether tests could pass while the requirement remains broken.
+- Assess security and data risk by verifying accepted invariants: when
+  applicable, authorization and input-validation boundaries are enforced,
+  secrets and sensitive values stay out of logs, artifacts, and evidence, and
+  failure paths preserve the accepted policy. Establish reachability from
+  source, configuration, or data-flow evidence, existing safe tests, or the
+  smallest safe bounded check within the accepted input or threat domain,
+  including inputs a boundary is required to reject. Do not create new
+  operational exploit artifacts or reusable attack tooling. These limits
+  constrain evidence generation, not analysis or reporting: report every
+  credible in-scope security concern under the ordinary taxonomy, and do not
+  omit or downgrade an evidence-backed reachable violation merely because no
+  exploit artifact was created. If stronger validation would require
+  operational attack material, stop at the strongest safe evidence and record
+  the smallest safe resolving check or the required-evidence gap. If the
+  accepted contract explicitly requires active exploit construction, record a
+  required-evidence or capability gap rather than silently substituting
+  weaker analysis.
 - Run focused, read-only, discriminating checks when the environment is ready.
   Record commands, outcomes, and environment limits; do not turn an unavailable
   broad suite into a finding unless an accepted claim requires that evidence.
-- Report findings first, ordered by materiality, with precise artifact
-  evidence, the violated accepted claim or repository constraint, and the
-  reachable in-domain consequence. Distinguish blockers, non-blocking
-  observations, and open questions. If none survive, state residual gaps.
+- Report artifact-grounded review concerns first, ordered by materiality.
+  Classify each as a blocking finding, a non-blocking observation, or an open
+  question; do not omit a credible concern solely because reachability,
+  impact, or contract status remains unresolved. Each blocking finding must
+  cite precise artifact evidence, the violated accepted claim or repository
+  constraint, and the reachable in-domain consequence. For an open question,
+  name the unresolved fact and the smallest discriminating check. If there
+  are no blocking findings, say so and state observations, open questions,
+  and residual gaps.
 - In a counted cold path, record a missing normative input as a terminal gap or
   `HOLD`; never ask the launcher, root, owner, or another agent for it. Outside
   a counted cold path, follow the ordinary owner-decision route.
