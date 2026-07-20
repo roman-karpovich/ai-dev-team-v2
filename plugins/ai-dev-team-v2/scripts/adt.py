@@ -72,6 +72,8 @@ class CliError(Exception):
 
 class JsonArgumentParser(argparse.ArgumentParser):
     def error(self, message: str) -> NoReturn:
+        if self.prog.endswith(" publication-gate"):
+            message = "Invalid publication-gate arguments."
         raise CliError("usage", message, exit_code=2)
 
 
@@ -1749,8 +1751,10 @@ def _emit(value: dict[str, Any], stream: Any) -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     arguments: argparse.Namespace | None = None
+    raw_arguments = tuple(sys.argv[1:] if argv is None else argv)
+    publication_invocation = "publication-gate" in raw_arguments
     try:
-        arguments = build_parser().parse_args(argv)
+        arguments = build_parser().parse_args(raw_arguments)
         result = dispatch(arguments)
         _emit(result, sys.stdout)
         if arguments.command == "review-gate" and result["verdict"] == "HOLD":
@@ -1762,12 +1766,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             return PUBLICATION_HOLD_EXIT_CODE
         return 0
     except CliError as error:
+        message = (
+            "Invalid publication-gate arguments."
+            if publication_invocation and error.code == "usage"
+            else error.message
+        )
         _emit(
             {
                 "ok": False,
                 "error": {
                     "code": error.code,
-                    "message": error.message,
+                    "message": message,
                     **({"details": error.details} if error.details else {}),
                 },
             },

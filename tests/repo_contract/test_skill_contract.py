@@ -49,7 +49,7 @@ DIALOGUE_REFINEMENT_ROUTE = (
     "before:task-action|candidate-edit|review-launch|worker-dispatch|publish",
 )
 PUBLICATION_GATE_ROUTE = (
-    "publication:commit|tag|branch-push|github-metadata|public-doc|ci-summary",
+    "publication:commit-metadata|tag-metadata|branch-name|github-metadata|public-prose|ci-summary",
     "references/publication-boundary.md",
     "immediately-before:persistent-write",
 )
@@ -747,6 +747,8 @@ class SkillContractTest(unittest.TestCase):
             "bypass.",
             "On success, require contract `adt.publication-gate.v1`, the actual "
             "destination, and the unchanged byte count and SHA-256.",
+            "The receipt attests only the supplied bytes. It does not inspect or "
+            "attest a Git object graph, branch contents, refspec, or completed write.",
             "Patterns and receipts are transient private control data, not KB, CI, "
             "or closeout artifacts.",
         ):

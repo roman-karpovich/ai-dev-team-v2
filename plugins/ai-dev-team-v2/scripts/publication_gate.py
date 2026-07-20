@@ -8,9 +8,10 @@ import html
 import os
 import re
 import stat
+import string
 from pathlib import Path
 from typing import Any, NoReturn
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit
 
 
 MAX_INPUT_BYTES = 1024 * 1024
@@ -22,27 +23,20 @@ PUBLICATION_GATE_CONTRACT_VERSION = "adt.publication-gate.v1"
 _OWNER = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?"
 _REPOSITORY = r"[A-Za-z0-9._-]{1,100}"
 _REPOSITORY_ID = re.compile(rf"^(?P<owner>{_OWNER})/(?P<repo>{_REPOSITORY})$")
-_GITHUB_WEB_REFERENCE = re.compile(
-    rf"(?i)(?<![A-Za-z0-9.-])(?:www\.)?github\.com/"
-    rf"(?P<owner>{_OWNER})/(?P<repo>{_REPOSITORY})"
+_GITHUB_HOST = (
+    r"(?:github\.com|api\.github\.com|gist\.github\.com|"
+    r"uploads\.github\.com|codeload\.github\.com|github\.dev|"
+    r"githubusercontent\.com|[A-Za-z0-9.-]+\.githubusercontent\.com|"
+    r"[A-Za-z0-9-]+\.github\.io)"
 )
-_GITHUB_API_URL = re.compile(
-    rf"(?i)https?://api\.github\.com/repos/"
-    rf"(?P<owner>{_OWNER})/(?P<repo>{_REPOSITORY})"
+_URL_CANDIDATE = re.compile(
+    rf"(?i)(?:"
+    rf"(?:https?:)?//[^\s<>\[\]()`\"']+"
+    rf"|(?<![A-Za-z0-9.-]){_GITHUB_HOST}(?::[0-9]+)?/[^\s<>\[\]()`\"']+"
+    rf")"
 )
-_GITHUB_WEB_ACCOUNT = re.compile(
-    rf"(?i)(?<![A-Za-z0-9.-])(?:www\.)?github\.com/"
-    rf"(?P<owner>{_OWNER})(?=$|[^A-Za-z0-9-])"
-)
-_GITHUB_API_ACCOUNT = re.compile(
-    rf"(?i)https?://api\.github\.com/users/(?P<owner>{_OWNER})"
-)
-_GITHUB_GIST_ACCOUNT = re.compile(
-    rf"(?i)https?://gist\.github\.com/(?P<owner>{_OWNER})"
-)
-_GITHUB_CONTENT_REFERENCE = re.compile(
-    rf"(?i)https?://(?:raw\.githubusercontent\.com|codeload\.github\.com|github\.dev)/"
-    rf"(?P<owner>{_OWNER})/(?P<repo>{_REPOSITORY})"
+_ROOT_RELATIVE_MARKDOWN_TARGET = re.compile(
+    r"\]\(\s*(?P<target>/[^)\s]+)"
 )
 _GITHUB_SCP_URL = re.compile(
     rf"(?i)(?<![A-Za-z0-9])git@github\.com:"
@@ -58,6 +52,45 @@ _OWNER_REPOSITORY_COMMIT = re.compile(
 )
 _GITHUB_MENTION = re.compile(
     rf"(?i)(?<![A-Za-z0-9_])@(?P<owner>{_OWNER})(?![A-Za-z0-9-])"
+)
+_MARKDOWN_ESCAPE = re.compile(r"\\([" + re.escape(string.punctuation) + r"])")
+_MARKDOWN_FENCE = re.compile(r"^\s*(?:>\s*)?(?P<fence>`{3,}|~{3,})")
+_INLINE_CODE = re.compile(r"(?P<ticks>`+).*?(?P=ticks)")
+_GITHUB_RESERVED_ROOTS = frozenset(
+    {
+        "about",
+        "account",
+        "apps",
+        "codespaces",
+        "collections",
+        "contact",
+        "customer-stories",
+        "enterprise",
+        "events",
+        "explore",
+        "features",
+        "issues",
+        "login",
+        "marketplace",
+        "new",
+        "notifications",
+        "organizations",
+        "orgs",
+        "pricing",
+        "pulls",
+        "readme",
+        "search",
+        "security",
+        "settings",
+        "site",
+        "sponsors",
+        "topics",
+        "trending",
+        "users",
+    }
+)
+_GITHUB_OWNER_ROUTES = frozenset(
+    {"organizations", "orgs", "sponsors", "users"}
 )
 
 
@@ -179,26 +212,123 @@ def _normalized_line(line: str) -> str:
         if decoded == normalized:
             break
         normalized = decoded
-    return normalized
+    normalized = _MARKDOWN_ESCAPE.sub(r"\1", normalized)
+    return normalized.replace("\\", "/")
+
+
+def _path_segments(path: str) -> list[str]:
+    segments: list[str] = []
+    for segment in path.split("/"):
+        if not segment or segment == ".":
+            continue
+        if segment == "..":
+            if segments:
+                segments.pop()
+            continue
+        segments.append(segment)
+    return segments
+
+
+def _github_owner_from_url(candidate: str) -> str | None:
+    if candidate.startswith("//"):
+        candidate = "https:" + candidate
+    elif candidate.startswith("/"):
+        candidate = "https://github.com" + candidate
+    elif "://" not in candidate:
+        candidate = "https://" + candidate
+    try:
+        parsed = urlsplit(candidate)
+        host = (parsed.hostname or "").casefold().rstrip(".")
+    except ValueError:
+        return ""
+    segments = _path_segments(parsed.path)
+
+    if host in {"github.com", "www.github.com"}:
+        if not segments:
+            return None
+        route = segments[0].casefold()
+        if route in _GITHUB_OWNER_ROUTES and len(segments) >= 2:
+            return segments[1]
+        if route in _GITHUB_RESERVED_ROOTS:
+            return None
+        return segments[0]
+
+    if host in {"api.github.com", "uploads.github.com"}:
+        if len(segments) >= 2 and segments[0].casefold() in {
+            "orgs",
+            "organizations",
+            "repos",
+            "users",
+        }:
+            return segments[1]
+        return None
+
+    if host in {
+        "codeload.github.com",
+        "gist.github.com",
+        "gist.githubusercontent.com",
+        "github.dev",
+        "raw.githubusercontent.com",
+    }:
+        return segments[0] if segments else ""
+
+    if host == "githubusercontent.com" or host.endswith(
+        ".githubusercontent.com"
+    ):
+        return ""
+
+    if host.endswith(".github.io"):
+        owner = host[: -len(".github.io")]
+        return owner if owner and "." not in owner and owner != "www" else ""
+
+    return None
+
+
+def _is_external_owner(owner: str, destination_owner: str) -> bool:
+    normalized = owner.casefold()
+    return normalized != destination_owner and normalized not in _GITHUB_RESERVED_ROOTS
 
 
 def _has_external_github_owner(line: str, destination_owner: str) -> bool:
-    for matcher in (
-        _GITHUB_WEB_REFERENCE,
-        _GITHUB_API_URL,
-        _GITHUB_WEB_ACCOUNT,
-        _GITHUB_API_ACCOUNT,
-        _GITHUB_GIST_ACCOUNT,
-        _GITHUB_CONTENT_REFERENCE,
-        _GITHUB_SCP_URL,
-        _OWNER_REPOSITORY_ISSUE,
-        _OWNER_REPOSITORY_COMMIT,
-        _GITHUB_MENTION,
-    ):
+    for match in _URL_CANDIDATE.finditer(line):
+        owner = _github_owner_from_url(match.group(0))
+        if owner is not None and _is_external_owner(owner, destination_owner):
+            return True
+    for match in _ROOT_RELATIVE_MARKDOWN_TARGET.finditer(line):
+        owner = _github_owner_from_url(match.group("target"))
+        if owner is not None and _is_external_owner(owner, destination_owner):
+            return True
+    for matcher in (_GITHUB_SCP_URL, _OWNER_REPOSITORY_ISSUE, _OWNER_REPOSITORY_COMMIT):
         for match in matcher.finditer(line):
-            if match.group("owner").casefold() != destination_owner:
+            if _is_external_owner(match.group("owner"), destination_owner):
                 return True
     return False
+
+
+def _visible_markdown_for_mentions(
+    line: str, fence: str | None
+) -> tuple[str, str | None]:
+    match = _MARKDOWN_FENCE.match(line)
+    if fence is not None:
+        if (
+            match is not None
+            and match.group("fence")[0] == fence[0]
+            and len(match.group("fence")) >= len(fence)
+        ):
+            return "", None
+        return "", fence
+    if match is not None:
+        return "", match.group("fence")
+    if line.startswith("    ") or line.startswith("\t"):
+        return "", None
+    return _INLINE_CODE.sub("", line), None
+
+
+def _has_external_github_mention(line: str, destination_owner: str) -> bool:
+    return any(
+        _is_external_owner(match.group("owner"), destination_owner)
+        for match in _GITHUB_MENTION.finditer(line)
+    )
 
 
 def _sensitive_patterns_sha256(patterns: tuple[str, ...]) -> str:
@@ -231,9 +361,15 @@ def evaluate_publication(
     )
 
     violations: set[tuple[int, str]] = set()
+    markdown_fence: str | None = None
     for line_number, line in enumerate(text.splitlines(), start=1):
         normalized = _normalized_line(line)
-        if _has_external_github_owner(normalized, destination_owner):
+        visible, markdown_fence = _visible_markdown_for_mentions(
+            normalized, markdown_fence
+        )
+        if _has_external_github_owner(
+            normalized, destination_owner
+        ) or _has_external_github_mention(visible, destination_owner):
             violations.add((line_number, "external_github_owner"))
         if any(pattern in normalized.casefold() for pattern in sensitive_patterns):
             violations.add((line_number, "sensitive_literal"))

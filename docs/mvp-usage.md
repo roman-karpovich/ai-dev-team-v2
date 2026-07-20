@@ -118,12 +118,14 @@ adt publication-gate --destination-repo "$DESTINATION_REPO" \
 ```
 
 The destination's GitHub owner is the default trust domain. The built-in rules
-hold cross-owner links, issue and commit autolinks, profile links, mentions, and
-GitHub content-host URLs. A temporary case-insensitive patterns file adds bare
-external names, SHAs, or private policy identifiers known from the task; omit
-it only when none exist. `HOLD` has no autonomous cross-owner bypass. Any edit
-requires a new pass, and the transient patterns and receipt must never enter
-KB, CI, or closeout artifacts. The installed
+hold cross-owner links, issue and commit autolinks, profile links, rendered
+mentions, and identity-bearing GitHub content-host URLs. A temporary
+case-insensitive patterns file adds bare external names, SHAs, or private policy
+identifiers known from the task; omit it only when none exist. `HOLD` has no
+autonomous cross-owner bypass. Any edit requires a new pass, and the transient
+patterns and receipt must never enter KB, CI, or closeout artifacts. A receipt
+covers only the supplied bytes, not a Git graph, refspec, or completed write.
+The installed
 [publication boundary](https://github.com/roman-karpovich/ai-dev-team-v2/blob/master/plugins/ai-dev-team-v2/references/publication-boundary.md)
 is the normative contract.
 

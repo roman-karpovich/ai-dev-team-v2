@@ -187,6 +187,49 @@ class PublicationGateCliTest(unittest.TestCase):
             payload["violations"],
         )
 
+    def test_canonical_github_url_variants_hold(self) -> None:
+        self.candidate.write_text(
+            "https://github.com:443/private-org/service/issues/1\n"
+            "https://github.com./private-org/service/issues/2\n"
+            r"https://github.com\private-org\service\issues\3" "\n"
+            r"[private](https://github\.com/private\-org/service)" "\n"
+            "https://github.com/example-org/" ".." "/private-org/service\n"
+            "//api.github.com/repos/private-org/service/issues/4\n"
+            "//raw.githubusercontent.com/private-org/service/main/file.txt\n"
+            "[issue](/private-org/service/issues/5)\n"
+            "https://api.github.com/orgs/private-org\n"
+            "https://gist.githubusercontent.com/private-user/id/raw/file.txt\n"
+            "https://private-user.github.io/private-repo/\n"
+            "https://private-user-images.githubusercontent.com/123/file.png\n",
+            encoding="utf-8",
+        )
+
+        payload, _ = self._run(expected_code=5)
+
+        self.assertEqual(
+            [
+                {"line": line, "rule": "external_github_owner"}
+                for line in range(1, 13)
+            ],
+            payload["violations"],
+        )
+
+    def test_reserved_github_routes_and_markdown_code_do_not_hold(self) -> None:
+        self.candidate.write_text(
+            "https://github.com/features/actions\n"
+            "```python\n"
+            "@dataclass\n"
+            "class Example:\n"
+            "    pass\n"
+            "```\n"
+            "Use `@scope/package` in this example.\n",
+            encoding="utf-8",
+        )
+
+        payload, _ = self._run()
+
+        self.assertTrue(payload["ok"])
+
     def test_cross_repository_commit_shorthand_is_blocked(self) -> None:
         self.candidate.write_text(
             "private-org/service@0123456789abcdef\n"
@@ -337,7 +380,33 @@ class PublicationGateCliTest(unittest.TestCase):
             capture_output=True,
         )
         self.assertEqual(2, result.returncode)
-        self.assertEqual("usage", json.loads(result.stderr)["error"]["code"])
+        error = json.loads(result.stderr)["error"]
+        self.assertEqual("usage", error["code"])
+        self.assertEqual("Invalid publication-gate arguments.", error["message"])
+
+        private_operand = "/" + "Users" + "/example/private-client-note"
+        sensitive = subprocess.run(
+            [
+                sys.executable,
+                str(ADT),
+                "publication-gate",
+                "--destination-repo",
+                "example-org/public-plugin",
+                "--input",
+                str(self.candidate),
+                private_operand,
+            ],
+            cwd=self.root,
+            check=False,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(2, sensitive.returncode)
+        self.assertEqual(
+            "Invalid publication-gate arguments.",
+            json.loads(sensitive.stderr)["error"]["message"],
+        )
+        self.assertNotIn(private_operand, sensitive.stderr)
 
 
 if __name__ == "__main__":

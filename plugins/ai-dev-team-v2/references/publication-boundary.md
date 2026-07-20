@@ -11,9 +11,10 @@ references to another owner do not. Destination publication authority does not
 authorize disclosure of a relationship with another trust domain.
 
 Treat cross-owner repository URLs, issue and commit autolinks, account-profile
-links, mentions, and GitHub content-host URLs as reciprocal or compromising
-publication. Public output describes the reusable task shape or failure class,
-not its originating external card, repository, account, or provider.
+links, rendered Markdown mentions, and identity-bearing GitHub content-host URLs
+as reciprocal or compromising publication. Public output describes the
+reusable task shape or failure class, not its originating external card,
+repository, account, or provider.
 
 The built-in checks cannot identify a bare repository name, SHA, customer name,
 or private policy name without context. Put every known cross-domain identity
@@ -39,6 +40,10 @@ intended destination identity.
 5. On success, require contract `adt.publication-gate.v1`, the actual
    destination, and the unchanged byte count and SHA-256. Any edit requires a
    new gate pass.
+
+The receipt attests only the supplied bytes. It does not inspect or attest a
+Git object graph, branch contents, refspec, or completed write. Existing
+history needs separate review; never present this receipt as proof of a push.
 
 Patterns and receipts are transient private control data, not KB, CI, or
 closeout artifacts. Never publish or persist them.

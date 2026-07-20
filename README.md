@@ -142,8 +142,9 @@ value of their own, then linked from the closeout instead of duplicated.
 
 ## Publication hygiene
 
-Immediately before a commit, tag, branch push, GitHub metadata write, public-doc
-write, or CI summary, the skill gates the exact outbound bytes:
+Before creating commit, tag, or branch metadata, or writing GitHub metadata,
+public prose, or a CI summary, the skill gates each exact outbound field or
+file:
 
 ```bash
 adt publication-gate --destination-repo "$DESTINATION_REPO" \
@@ -154,7 +155,8 @@ The destination's GitHub owner is the default trust domain. Cross-owner links,
 autolinks, profiles, and mentions return `HOLD`; temporary case-insensitive
 patterns cover bare names and SHAs known from the task. The gate has no
 autonomous cross-owner bypass, and its patterns and receipt are never durable
-artifacts. See the [publication boundary](plugins/ai-dev-team-v2/references/publication-boundary.md).
+artifacts. A receipt covers only the supplied bytes, never a Git graph or push.
+See the [publication boundary](plugins/ai-dev-team-v2/references/publication-boundary.md).
 
 ## Process report
 

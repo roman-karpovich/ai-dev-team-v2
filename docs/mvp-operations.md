@@ -137,9 +137,11 @@ adt publication-gate --destination-repo "$DESTINATION_REPO" \
 This command is local-only and needs no Git workspace. The destination owner is
 the default GitHub trust domain. `--patterns-file` supplies case-insensitive
 literals that the built-in link checks cannot infer; omit it only when the task
-has no such cross-domain or private identity. `HOLD` exits 5, errors exit 3,
-and success returns an ephemeral exact-byte receipt. The command never
-publishes. Follow the
+has no such cross-domain or private identity. `HOLD` exits 5, validation
+failures exit 3, and success returns an ephemeral exact-byte receipt. CLI
+syntax, internal, and interruption failures retain distinct nonzero statuses.
+The command never publishes or attests a Git graph, refspec, or completed
+write. Follow the
 [publication boundary](https://github.com/roman-karpovich/ai-dev-team-v2/blob/master/plugins/ai-dev-team-v2/references/publication-boundary.md)
 for routing and retention rules.
 
