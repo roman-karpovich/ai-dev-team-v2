@@ -20,6 +20,8 @@ Repository files must be portable and self-contained. Do not commit absolute
 home-directory paths, local file URIs, sibling-repository locators, escaping
 symlinks, credentials, or references to external private documentation.
 
+Commit and tag messages are part of public source. Gate all persistent
+publication metadata through the plugin's publication boundary before writing.
+
 Owner-specific forbidden patterns belong in an untracked pattern file supplied
 to the public-source checker at review time.
-

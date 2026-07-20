@@ -19,6 +19,7 @@ EXPECTED_REFERENCES = {
         "claude-runtime.md",
         "convergence-control.md",
         "incident-observability.md",
+        "publication-boundary.md",
         "semantic-boundaries.md",
         "task-lifecycle.md",
         "verification-environments.md",
@@ -28,6 +29,7 @@ EXPECTED_REFERENCES = {
         "cold-independent-review.md",
         "convergence-control.md",
         "incident-observability.md",
+        "publication-boundary.md",
         "semantic-boundaries.md",
         "task-lifecycle.md",
         "verification-environments.md",
@@ -45,6 +47,11 @@ DIALOGUE_REFINEMENT_ROUTE = (
     "dialogue:owner-correction|design-hypothesis|scope-challenge",
     "references/convergence-control.md",
     "before:task-action|candidate-edit|review-launch|worker-dispatch|publish",
+)
+PUBLICATION_GATE_ROUTE = (
+    "publication:commit-metadata|tag-metadata|branch-name|github-metadata|public-prose|ci-summary",
+    "references/publication-boundary.md",
+    "immediately-before:persistent-write",
 )
 EXPECTED_TASK_STATE_COMMANDS = {
     tuple(shlex.split(command))
@@ -78,6 +85,7 @@ EXPECTED_SKILL_ROUTES = {
             "references/task-lifecycle.md",
             "after:claude-if-triggered;before:adt-state|mutation",
         ),
+        PUBLICATION_GATE_ROUTE,
         DIALOGUE_REFINEMENT_ROUTE,
         (
             "depends-on:auto-reporting|framework-lifecycle|process-lifecycle|termination|propagation|bootstrap|event-cardinality",
@@ -122,6 +130,7 @@ EXPECTED_SKILL_ROUTES = {
             "references/task-lifecycle.md",
             "after:prior-preflights;before:adt-state|mutation",
         ),
+        PUBLICATION_GATE_ROUTE,
         DIALOGUE_REFINEMENT_ROUTE,
         (
             "depends-on:auto-reporting|framework-lifecycle|process-lifecycle|termination|propagation|bootstrap|event-cardinality",
@@ -182,6 +191,12 @@ QUIESCENT_COLD_BOUNDARIES = {
         "quiescent-counted-path",
         "before:counted-cold-launch",
         "other-child-agents:terminal;counted-reviewers:one-at-a-time;reviewer-handle:hidden-from-other-agents",
+        "launch:defer",
+    ),
+    (
+        "sealed-artifact-output-isolation",
+        "before:counted-cold-launch",
+        "sealed-artifact:reviewer-owned;destinations:absolute;launcher-output-if-present:distinct-canonical-target",
         "launch:defer",
     ),
     (
@@ -703,6 +718,65 @@ class SkillContractTest(unittest.TestCase):
         )
         self.assertIn("There is no `--include-text` mode.", operations)
 
+    def test_publication_gate_blocks_unauthorized_cross_repo_provenance(self) -> None:
+        boundary = " ".join(
+            read(PLUGIN / "references/publication-boundary.md").split()
+        )
+        convergence = " ".join(
+            read(PLUGIN / "references/convergence-control.md").split()
+        )
+        readme = " ".join(read(ROOT / "README.md").split())
+        usage = " ".join(read(ROOT / "docs/mvp-usage.md").split())
+
+        for name in EXPECTED_SKILL_ROUTES:
+            _, body = frontmatter(SKILLS / name / "SKILL.md")
+            with self.subTest(skill=name):
+                self.assertIn(PUBLICATION_GATE_ROUTE, skill_route_rows(body))
+
+        for requirement in (
+            "Load this reference only immediately before a persistent publication "
+            "write. Private drafting and discussion do not trigger it.",
+            "The GitHub owner of the actual destination is the default trust domain.",
+            "references to another owner do not.",
+            "Put every known cross-domain identity from the task, plus any sensitive "
+            "same-owner sibling identity, in a temporary patterns file, one case-"
+            "insensitive literal per line.",
+            "Resolve `DESTINATION_REPO` from the actual GitHub write target or "
+            "canonical remote, never from the outbound text.",
+            "`HOLD` means rewrite or generalize. There is no autonomous cross-owner "
+            "bypass.",
+            "On success, require contract `adt.publication-gate.v1`, the actual "
+            "destination, and the unchanged byte count and SHA-256.",
+            "The receipt attests only the supplied bytes. It does not inspect or "
+            "attest a Git object graph, branch contents, refspec, or completed write.",
+            "Patterns and receipts are transient private control data, not KB, CI, "
+            "or closeout artifacts.",
+        ):
+            self.assertIn(requirement, boundary)
+
+        self.assertLessEqual(len(boundary.split()), 450)
+
+        self.assertIn(
+            "Interleave plugin and card execution, not provenance. Public plugin "
+            "artifacts describe the reusable failure class, not the originating card "
+            "or repository.",
+            convergence,
+        )
+        for public_doc in (readme, usage):
+            self.assertIn(
+                "default trust domain",
+                public_doc,
+            )
+            self.assertIn(
+                "adt publication-gate --destination-repo", public_doc
+            )
+            self.assertIn(
+                "no autonomous cross-owner bypass", public_doc
+            )
+            self.assertIn(
+                "patterns", public_doc
+            )
+
     def test_quickstart_documents_compact_input_and_autonomous_protocol(self) -> None:
         usage = " ".join(read(ROOT / "docs/mvp-usage.md").split())
 
@@ -957,6 +1031,30 @@ class SkillContractTest(unittest.TestCase):
             "Record unresolved domain membership as a terminal gap or `HOLD` "
             "without contacting the owner or launcher.",
             semantic,
+        )
+
+    def test_counted_reviewer_separates_sealed_report_from_launcher_output(self) -> None:
+        reference = " ".join(
+            read(PLUGIN / "references/cold-independent-review.md").split()
+        )
+
+        self.assertIn(
+            "Before launch, require it and every launcher-owned final-message or "
+            "transcript destination to be absolute.",
+            reference,
+        )
+        self.assertIn(
+            "Resolve each destination to its canonical target.",
+            reference,
+        )
+        self.assertIn(
+            "If a destination such as Codex `-o` names the sealed artifact target, "
+            "or any target identity cannot be established, defer the launch.",
+            reference,
+        )
+        self.assertIn(
+            "Never route launcher output to the sealed artifact destination.",
+            reference,
         )
 
     def test_outbound_contact_self_aborts_without_waiting_for_a_reply(self) -> None:

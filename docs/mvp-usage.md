@@ -106,6 +106,29 @@ KB/docs convention. Never invent a cross-repository write. If neither exists,
 the agent supplies a copy-ready bundle and asks one focused routing question
 before making a tracked write.
 
+## Publication gate
+
+Immediately before a persistent publication write, the agent resolves the
+destination from the actual GitHub target or canonical remote and gates the
+exact bytes it will write:
+
+```bash
+adt publication-gate --destination-repo "$DESTINATION_REPO" \
+  --input "$OUTBOUND_FILE" --patterns-file "$PATTERNS_FILE"
+```
+
+The destination's GitHub owner is the default trust domain. The built-in rules
+hold cross-owner links, issue and commit autolinks, profile links, rendered
+mentions, and identity-bearing GitHub content-host URLs. A temporary
+case-insensitive patterns file adds bare external names, SHAs, or private policy
+identifiers known from the task; omit it only when none exist. `HOLD` has no
+autonomous cross-owner bypass. Any edit requires a new pass, and the transient
+patterns and receipt must never enter KB, CI, or closeout artifacts. A receipt
+covers only the supplied bytes, not a Git graph, refspec, or completed write.
+The installed
+[publication boundary](https://github.com/roman-karpovich/ai-dev-team-v2/blob/master/plugins/ai-dev-team-v2/references/publication-boundary.md)
+is the normative contract.
+
 ## Optional operator inspection
 
 The agent owns these commands in normal skill use. For manual inspection or

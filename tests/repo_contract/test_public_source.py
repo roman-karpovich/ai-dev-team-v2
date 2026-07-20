@@ -20,6 +20,12 @@ class PublicSourceTest(unittest.TestCase):
     def test_current_history_is_portable(self) -> None:
         self.assertEqual([], check_public_source.scan_history(ROOT))
 
+    def test_current_commit_and_annotated_tag_messages_are_portable(self) -> None:
+        self.assertEqual([], check_public_source.scan_commit_messages(ROOT))
+        self.assertEqual(
+            [], check_public_source.scan_annotated_tag_messages(ROOT)
+        )
+
     def test_detects_absolute_home_locator_without_echoing_content(self) -> None:
         locator = b"/" + b"Users" + b"/" + b"example" + b"/project"
         violations = check_public_source.find_line_violations(
@@ -102,6 +108,76 @@ class PublicSourceTest(unittest.TestCase):
             self.assertEqual(1, len(violations))
             self.assertEqual("absolute-home", violations[0].rule)
             self.assertTrue(violations[0].path.startswith("artifact.txt@"))
+
+    def test_commit_metadata_detects_external_pattern_without_echoing_it(self) -> None:
+        with tempfile.TemporaryDirectory() as root_dir:
+            root = Path(root_dir)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Public Source Test"],
+                cwd=root,
+                check=True,
+            )
+            sentinel = b"private" + b"-relationship"
+            (root / "clean.txt").write_text("clean")
+            subprocess.run(["git", "add", "clean.txt"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "commit", "-q", "-m", sentinel.decode()],
+                cwd=root,
+                check=True,
+            )
+
+            violations = check_public_source.scan_commit_messages(
+                root, (sentinel,)
+            )
+
+            self.assertEqual(1, len(violations))
+            self.assertEqual("external-pattern", violations[0].rule)
+            self.assertTrue(violations[0].path.startswith("commit@"))
+            self.assertNotIn(sentinel.decode(), repr(violations))
+
+    def test_annotated_tag_detects_external_pattern_without_echoing_it(self) -> None:
+        with tempfile.TemporaryDirectory() as root_dir:
+            root = Path(root_dir)
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "test@example.invalid"],
+                cwd=root,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.name", "Public Source Test"],
+                cwd=root,
+                check=True,
+            )
+            (root / "clean.txt").write_text("clean")
+            subprocess.run(["git", "add", "clean.txt"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "commit", "-q", "-m", "clean commit"],
+                cwd=root,
+                check=True,
+            )
+            sentinel = b"private" + b"-relationship"
+            subprocess.run(
+                ["git", "tag", "-a", "v-test", "-m", sentinel.decode()],
+                cwd=root,
+                check=True,
+            )
+
+            violations = check_public_source.scan_annotated_tag_messages(
+                root, (sentinel,)
+            )
+
+            self.assertEqual(1, len(violations))
+            self.assertEqual("external-pattern", violations[0].rule)
+            self.assertTrue(violations[0].path.startswith("tag@"))
+            self.assertNotIn("v-test", violations[0].path)
+            self.assertNotIn(sentinel.decode(), repr(violations))
 
 
 if __name__ == "__main__":

@@ -12,7 +12,7 @@ handoffs durable while leaving coding and review judgment to the active host.
 
 ## Status
 
-`v0.1.52` is the first experimental supervised-autonomy prerelease. It is ready
+`v0.1.54` is the current experimental supervised-autonomy prerelease. It is ready
 for dogfood on real repositories with an owner available for genuine product,
 architecture, scope, or release-authority forks.
 
@@ -49,13 +49,13 @@ The installer registers a local marketplace and links `~/.local/bin/adt` to the
 selected checkout. Install from a permanent directory: moving or deleting that
 checkout breaks the CLI and invalidates the marketplace source.
 
-## Install v0.1.52
+## Install v0.1.54
 
 Clone the release into a durable location:
 
 ```bash
 mkdir -p "$HOME/src"
-git clone --branch v0.1.52 --depth 1 \
+git clone --branch v0.1.54 --depth 1 \
   https://github.com/roman-karpovich/ai-dev-team-v2.git \
   "$HOME/src/ai-dev-team-v2"
 cd "$HOME/src/ai-dev-team-v2"
@@ -139,6 +139,24 @@ copy-ready bundle and asks one routing question before making a tracked write.
 Raw red/green logs are not archived by default. ADRs, runbooks, migration notes,
 review reports, and reproduction notes are added only when they have durable
 value of their own, then linked from the closeout instead of duplicated.
+
+## Publication hygiene
+
+Before creating commit, tag, or branch metadata, or writing GitHub metadata,
+public prose, or a CI summary, the skill gates each exact outbound field or
+file:
+
+```bash
+adt publication-gate --destination-repo "$DESTINATION_REPO" \
+  --input "$OUTBOUND_FILE" --patterns-file "$PATTERNS_FILE"
+```
+
+The destination's GitHub owner is the default trust domain. Cross-owner links,
+autolinks, profiles, and mentions return `HOLD`; temporary case-insensitive
+patterns cover bare names and SHAs known from the task. The gate has no
+autonomous cross-owner bypass, and its patterns and receipt are never durable
+artifacts. A receipt covers only the supplied bytes, never a Git graph or push.
+See the [publication boundary](plugins/ai-dev-team-v2/references/publication-boundary.md).
 
 ## Process report
 
