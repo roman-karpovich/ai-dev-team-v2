@@ -24,7 +24,7 @@ _OWNER = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?"
 _REPOSITORY = r"[A-Za-z0-9._-]{1,100}"
 _REPOSITORY_ID = re.compile(rf"^(?P<owner>{_OWNER})/(?P<repo>{_REPOSITORY})$")
 _GITHUB_HOST = (
-    r"(?:github\.com|api\.github\.com|gist\.github\.com|"
+    r"(?:github\.com|www\.github\.com|api\.github\.com|gist\.github\.com|"
     r"uploads\.github\.com|codeload\.github\.com|github\.dev|"
     r"githubusercontent\.com|[A-Za-z0-9.-]+\.githubusercontent\.com|"
     r"[A-Za-z0-9-]+\.github\.io)"
@@ -37,6 +37,9 @@ _URL_CANDIDATE = re.compile(
 )
 _ROOT_RELATIVE_MARKDOWN_TARGET = re.compile(
     r"\]\(\s*(?P<target>/[^)\s]+)"
+)
+_ROOT_RELATIVE_REFERENCE_TARGET = re.compile(
+    r"^ {0,3}\[[^]\n]+\]:[ \t]*<?(?P<target>/[^>\s]+)>?"
 )
 _GITHUB_SCP_URL = re.compile(
     rf"(?i)(?<![A-Za-z0-9])git@github\.com:"
@@ -54,7 +57,7 @@ _GITHUB_MENTION = re.compile(
     rf"(?i)(?<![A-Za-z0-9_])@(?P<owner>{_OWNER})(?![A-Za-z0-9-])"
 )
 _MARKDOWN_ESCAPE = re.compile(r"\\([" + re.escape(string.punctuation) + r"])")
-_MARKDOWN_FENCE = re.compile(r"^\s*(?:>\s*)?(?P<fence>`{3,}|~{3,})")
+_MARKDOWN_FENCE = re.compile(r"^ {0,3}(?:> ?)?(?P<fence>`{3,}|~{3,})")
 _INLINE_CODE = re.compile(r"(?P<ticks>`+).*?(?P=ticks)")
 _GITHUB_RESERVED_ROOTS = frozenset(
     {
@@ -294,10 +297,14 @@ def _has_external_github_owner(line: str, destination_owner: str) -> bool:
         owner = _github_owner_from_url(match.group(0))
         if owner is not None and _is_external_owner(owner, destination_owner):
             return True
-    for match in _ROOT_RELATIVE_MARKDOWN_TARGET.finditer(line):
-        owner = _github_owner_from_url(match.group("target"))
-        if owner is not None and _is_external_owner(owner, destination_owner):
-            return True
+    for matcher in (
+        _ROOT_RELATIVE_MARKDOWN_TARGET,
+        _ROOT_RELATIVE_REFERENCE_TARGET,
+    ):
+        for match in matcher.finditer(line):
+            owner = _github_owner_from_url(match.group("target"))
+            if owner is not None and _is_external_owner(owner, destination_owner):
+                return True
     for matcher in (_GITHUB_SCP_URL, _OWNER_REPOSITORY_ISSUE, _OWNER_REPOSITORY_COMMIT):
         for match in matcher.finditer(line):
             if _is_external_owner(match.group("owner"), destination_owner):

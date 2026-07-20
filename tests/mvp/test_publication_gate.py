@@ -200,7 +200,8 @@ class PublicationGateCliTest(unittest.TestCase):
             "https://api.github.com/orgs/private-org\n"
             "https://gist.githubusercontent.com/private-user/id/raw/file.txt\n"
             "https://private-user.github.io/private-repo/\n"
-            "https://private-user-images.githubusercontent.com/123/file.png\n",
+            "https://private-user-images.githubusercontent.com/123/file.png\n"
+            "www.github.com/private-org/service/issues/6\n",
             encoding="utf-8",
         )
 
@@ -209,19 +210,48 @@ class PublicationGateCliTest(unittest.TestCase):
         self.assertEqual(
             [
                 {"line": line, "rule": "external_github_owner"}
-                for line in range(1, 13)
+                for line in range(1, 14)
             ],
+            payload["violations"],
+        )
+
+    def test_root_relative_reference_style_link_holds(self) -> None:
+        self.candidate.write_text(
+            "[source][private]\n"
+            "[private]: /private-org/service/issues/1\n",
+            encoding="utf-8",
+        )
+
+        payload, _ = self._run(expected_code=5)
+
+        self.assertEqual(
+            [{"line": 2, "rule": "external_github_owner"}],
+            payload["violations"],
+        )
+
+    def test_over_indented_pseudo_fence_does_not_hide_mention(self) -> None:
+        self.candidate.write_text(
+            "    ```\n"
+            "Thanks @private-user\n"
+            "```\n",
+            encoding="utf-8",
+        )
+
+        payload, _ = self._run(expected_code=5)
+
+        self.assertEqual(
+            [{"line": 2, "rule": "external_github_owner"}],
             payload["violations"],
         )
 
     def test_reserved_github_routes_and_markdown_code_do_not_hold(self) -> None:
         self.candidate.write_text(
             "https://github.com/features/actions\n"
-            "```python\n"
+            "   ```python\n"
             "@dataclass\n"
             "class Example:\n"
             "    pass\n"
-            "```\n"
+            "   ```\n"
             "Use `@scope/package` in this example.\n",
             encoding="utf-8",
         )
