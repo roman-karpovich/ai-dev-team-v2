@@ -11,7 +11,9 @@ facts merely to satisfy it.
 Use one compact pre-build risk synthesis only when the change touches stateful
 ingestion, replay or cursor behavior, transactions or concurrency, migrations
 or mixed versions, retention, rebuild or rollback, malformed or failure
-behavior, production query bounds, or operational prerequisites. Cover only
+behavior, production query bounds, or operational prerequisites. Treat
+comparable state-integrity, ordering, recovery, boundedness, or rollout risk
+the same way. Cover only
 the applicable invariants, writers and ordering, failure windows, recovery
 path, read bound, rollout precondition, and smallest discriminating seam. Turn
 a credible risk into a test, explicit design constraint, owner decision, or
@@ -74,15 +76,17 @@ Declare one purpose before each path:
   lineage; it is not a fresh cold oracle.
 - `diagnostic-cold` explicitly spends independence to reduce uncertainty on a
   non-final candidate.
-- `final-cold` is the final acceptance oracle for the declared profile.
+- `final-cold` contributes final-phase acceptance evidence for the declared
+  profile; one sealed path is never trusted acceptance by itself.
 - `complementary-final-cold` adds a separately required final path, such as an
-  owner-selected two-model profile; it is not a default restart.
+  owner-selected two-model requirement; it is not a default restart.
 
 A final-acceptance cold path is eligible ex ante only when its artifact is
 immutable and clean, contract and accepted domain are fixed, focused checks
-are current for its `ArtifactKey`, adversarial integration is done, known
-blockers, evidence gaps, and owner decisions are closed, and no edit lane is
-active or planned. An explicit `diagnostic-cold` path may reduce uncertainty
+are current for its `ArtifactKey`, adversarial integration has completed or
+the owner explicitly accepted running this generation without it, known
+blockers, evidence gaps, and owner decisions are closed,
+and no edit lane is active or planned. An explicit `diagnostic-cold` path may reduce uncertainty
 but never counts as final acceptance. Do not launch cold review on a candidate
 with a known-open blocker or planned edit.
 
@@ -102,9 +106,9 @@ consolidated.
 - A second distinct repaired `ReviewKey` with a material `HOLD` requires
   `REASSESS` before more edits: consolidate recurring causes, challenged
   assumptions, scope growth, and viable alternatives.
-- A third material `HOLD` requires a scope split, architecture change,
-  explicit owner decision, or documented rationale that continuing is cheaper
-  and safer.
+- A third or later material `HOLD` requires an explicit owner decision: a
+  scope split, an architecture change, or an owner-accepted rationale that
+  continuing is cheaper and safer.
 
 Infrastructure failure, not launched, interrupted, no usable result,
 independence compromised, and capability-only gaps stay fail-closed but do not
@@ -117,7 +121,10 @@ Treat reusable verification as an immutable content-addressed receipt concept,
 not a mutable cache. An exact receipt matches `ArtifactKey`, canonical command,
 working directory and selection, toolchain, dependency and build digests,
 fixtures, migrations, schema and database reset, plus relevant environment,
-database and container identity. Never rerun a successful exact identity.
+database and container identity. Do not rerun a successful exact identity
+merely for reassurance; rerun it when the owner requests a rerun or a named
+flakiness, nondeterminism, or freshness hypothesis puts the prior result in
+question.
 
 After a candidate change, run the smallest affected check and one proportionate
 final full gate. Do not reuse evidence across SHAs automatically until

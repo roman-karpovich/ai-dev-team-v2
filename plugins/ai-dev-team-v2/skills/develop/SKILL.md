@@ -9,24 +9,26 @@ Keep the active Codex or Claude session as the native executive. Add durable
 task boundaries without replacing its planning, tools, dialogue, subagents, or
 repository instructions. Do not launch another provider automatically.
 
-All `references/...` locators below resolve from the installed plugin root.
+Resolve every `references/...` locator below from the installed plugin root —
+the installed plugin directory that contains `skills/` and `references/` —
+not from this skill directory.
 
 ## Route references
 
-| Trigger | Resource | Boundary |
-| --- | --- | --- |
-| `host:claude` | `references/claude-runtime.md` | `before:repository-exposure\|adt-state\|editing` |
-| `always` | `references/task-lifecycle.md` | `after:claude-if-triggered;before:adt-state\|mutation` |
-| `publication:commit-metadata\|tag-metadata\|branch-name\|github-metadata\|public-prose\|ci-summary` | `references/publication-boundary.md` | `immediately-before:persistent-write` |
-| `dialogue:owner-correction\|design-hypothesis\|scope-challenge` | `references/convergence-control.md` | `before:task-action\|candidate-edit\|review-launch\|worker-dispatch\|publish` |
-| `depends-on:auto-reporting\|framework-lifecycle\|process-lifecycle\|termination\|propagation\|bootstrap\|event-cardinality` | `references/incident-observability.md` | `before:task-contract\|candidate-edit` |
-| `acceptance:input-domain\|upstream-replacement:removed,deprecated,unavailable->local-derivation` | `references/semantic-boundaries.md` | `before:task-contract` |
-| `risk:stateful-ingestion\|replay-cursor\|transactions-concurrency\|migrations-mixed-versions\|retention-rebuild-rollback\|malformed-failure\|production-query-bounds\|operational-prerequisites\|repair:material-hold\|plugin-card-interleave` | `references/convergence-control.md` | `before:candidate-edit\|repair-restart\|plugin-install` |
-| `check:executes-source\|artifact\|runtime` | `references/verification-environments.md` | `before:check-execution\|result-interpretation` |
-| `verification:unavailable-dependency\|runtime\|production-bootstrap\|environment-equivalence` | `references/verification-environments.md` | `before:verification-selection` |
+Read a routed reference when its condition holds, at the stated moment. A
+condition holds when any of its listed cases applies.
 
-`|` joins alternatives or boundary members; `;` sequences boundaries from
-left to right.
+| When | Resource | Read it |
+| --- | --- | --- |
+| The active host is Claude Code. | `references/claude-runtime.md` | Before repository or artifact exposure, ADT state, or editing. |
+| Always. | `references/task-lifecycle.md` | After the Claude runtime reference when that applied; before any ADT state read or mutation. |
+| The write publishes commit metadata, tag metadata, a branch name, GitHub metadata, public prose, or a CI summary. | `references/publication-boundary.md` | Immediately before the persistent write. |
+| New material owner dialogue arrives: an authoritative correction, a tentative design hypothesis, or a scope challenge or question. | `references/convergence-control.md` | Before further task action, candidate edits, review launch, worker dispatch, or publication. |
+| The requested outcome or a reported or discovered symptom may depend on automatic reporting, framework or process lifecycle, termination or propagation, bootstrap, or event cardinality. | `references/incident-observability.md` | Before forming the task contract or editing a candidate. |
+| Acceptance turns on an input-domain boundary, or a removed, deprecated, or unavailable upstream value is replaced by a local derivation. | `references/semantic-boundaries.md` | Before forming the task contract. |
+| The change touches stateful ingestion, replay or cursor behavior, transactions or concurrency, migrations or mixed versions, retention, rebuild or rollback, malformed or failure behavior, production query bounds, or operational prerequisites, or carries comparable state-integrity, ordering, recovery, boundedness, or rollout risk; a repair follows a material `HOLD`; or plugin and card work interleave. | `references/convergence-control.md` | Before candidate edits, a repair restart, or a plugin install. |
+| Any check executes source, an artifact, or a runtime. | `references/verification-environments.md` | Before executing the check and before interpreting its result. |
+| A required check needs an unavailable dependency, runtime, production bootstrap, or load-bearing environment equivalence. | `references/verification-environments.md` | Before selecting the verification approach. |
 
 When the dialogue route fires, stop incompatible work and refine the working
 plan under the convergence reference before resuming task action.
@@ -77,6 +79,10 @@ checkpoint.
   assumption.
 - Inspect before editing. Use the host's native planning, tools, delegation,
   and repository workflows rather than recreating them here.
+- When two or more independent bounded seams can proceed without shared
+  mutation and coordination is cheaper than serial work, use native parallel
+  delegation; keep tightly coupled edits with one integrator. Do not treat
+  fan-out as independent review.
 - When the convergence route fires, synthesize the applicable failure seams
   before candidate edits. Keep that compact model in the working plan unless a
   normal repository decision or checkpoint must outlive the session.
@@ -96,8 +102,10 @@ checkpoint.
   fresh session to continue without a transcript.
 - Before completion, disclose whether independent review ran. When the owner,
   repository policy, or task contract requires it, freeze an immutable commit
-  range and keep the development task active while fresh standalone cold paths
-  run in separate checkouts; provide only neutral scope and acceptance input,
+  range and keep the development task open but paused while fresh standalone
+  cold paths run in separate checkouts under
+  `references/cold-independent-review.md`; do not complete it before
+  post-embargo adjudication. Provide only neutral scope and acceptance input,
   never builder findings or transcript.
 - Complete only after the requested outcome and focused discriminating checks
   are satisfied and no blocking owner decision remains. Completion records

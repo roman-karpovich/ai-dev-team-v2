@@ -13,9 +13,10 @@ from repository or applicable platform evidence.
 
 A constructible out-of-domain counterexample does not enlarge the contract.
 If domain membership is material and unresolved, inspect available evidence or
-ask one focused owner decision before adding defensive behavior. A review
-finding must identify a reachable trigger inside the accepted domain or a
-contradicted boundary.
+ask one focused owner decision before adding defensive behavior. A blocking
+review finding must identify a reachable trigger inside the accepted domain
+or a contradicted boundary. Record a credible but unresolved domain concern
+as a non-blocking observation or open question instead of dropping it.
 
 For a counted cold path, the cold-review contact boundary overrides this
 owner-decision route. Record unresolved domain membership as a terminal gap or

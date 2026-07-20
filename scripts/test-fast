@@ -4,5 +4,14 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$repo_root"
 
-python3 -m unittest discover -s tests -p 'test_*.py'
+python_bin="${PYTHON:-python3}"
+if ! "$python_bin" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then
+  {
+    echo "scripts/test-fast: Python >= 3.10 is required;" \
+      "found: $("$python_bin" --version 2>&1 || echo "no usable interpreter")."
+    echo "Point PYTHON at a supported interpreter, e.g.: PYTHON=python3.13 ./scripts/test-fast"
+  } >&2
+  exit 2
+fi
 
+exec "$python_bin" -m unittest discover -s tests -p 'test_*.py'

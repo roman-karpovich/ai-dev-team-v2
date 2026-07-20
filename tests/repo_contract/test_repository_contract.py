@@ -45,6 +45,33 @@ class RepositoryContractTest(unittest.TestCase):
         self.assertNotIn("make test", entrypoint)
         self.assertNotIn("test-all", entrypoint)
 
+    def test_fast_entrypoint_fails_closed_on_unsupported_python(self) -> None:
+        import os
+        import subprocess
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as directory:
+            stub = Path(directory) / "python-too-old"
+            stub.write_text(
+                "#!/bin/sh\n"
+                'case "$1" in\n'
+                "  -c) exit 1 ;;\n"
+                '  --version) echo "Python 3.9.99"; exit 0 ;;\n'
+                "esac\n"
+                "exit 0\n"
+            )
+            stub.chmod(0o755)
+            result = subprocess.run(
+                [str(ROOT / "scripts/test-fast")],
+                env={**os.environ, "PYTHON": str(stub)},
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        self.assertEqual(2, result.returncode, result.stdout + result.stderr)
+        self.assertIn("3.10", result.stderr)
+        self.assertIn("PYTHON=", result.stderr)
+
     def test_troubleshooting_error_codes_exist_in_adt_cli(self) -> None:
         operations = (ROOT / "docs/mvp-operations.md").read_text()
         troubleshooting_codes = {

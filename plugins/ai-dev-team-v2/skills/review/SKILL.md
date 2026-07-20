@@ -10,25 +10,28 @@ intent, repository constraints, immutable scope, and observable behavior. Do
 not launch another provider automatically or repair findings unless the user
 explicitly changes the task.
 
-All `references/...` locators below resolve from the installed plugin root.
+Resolve every `references/...` locator below from the installed plugin root —
+the installed plugin directory that contains `skills/` and `references/` —
+not from this skill directory.
 
-## Load preflights before state
+## Route references
 
-| Trigger | Resource | Boundary |
+The first four rows are ordered preflights; later rows load on demand when
+their condition holds. A condition holds when any of its listed cases
+applies.
+
+| When | Resource | Read it |
 | --- | --- | --- |
-| `request:cold\|independent\|two-model` | `references/cold-independent-review.md` | `before:artifact-inspection\|repository-context\|adt-state` |
-| `request:cold\|independent\|two-model\|repair:material-hold\|evidence:reuse` | `references/convergence-control.md` | `after:cold-preflight-if-triggered;before:review-key\|check-selection\|counted-cold-launch` |
-| `host:claude` | `references/claude-runtime.md` | `after:cold-if-triggered;before:repository-exposure\|adt-state\|artifact-inspection` |
-| `always` | `references/task-lifecycle.md` | `after:prior-preflights;before:adt-state\|mutation` |
-| `publication:commit-metadata\|tag-metadata\|branch-name\|github-metadata\|public-prose\|ci-summary` | `references/publication-boundary.md` | `immediately-before:persistent-write` |
-| `dialogue:owner-correction\|design-hypothesis\|scope-challenge` | `references/convergence-control.md` | `before:task-action\|candidate-edit\|review-launch\|worker-dispatch\|publish` |
-| `depends-on:auto-reporting\|framework-lifecycle\|process-lifecycle\|termination\|propagation\|bootstrap\|event-cardinality` | `references/incident-observability.md` | `before:claim-artifact-inspection` |
-| `acceptance:input-domain\|upstream-replacement:removed,deprecated,unavailable->local-derivation` | `references/semantic-boundaries.md` | `before:claim-judgment` |
-| `check:executes-source\|artifact\|runtime` | `references/verification-environments.md` | `before:check-execution\|result-interpretation` |
-| `verification:unavailable-dependency\|runtime\|production-bootstrap\|environment-equivalence` | `references/verification-environments.md` | `before:verification-selection` |
-
-`|` joins alternatives or boundary members; `;` sequences boundaries from
-left to right.
+| The review is explicitly requested as cold, independent, or two-model. | `references/cold-independent-review.md` | First — before artifact inspection, repository context, or ADT state. |
+| The review is explicitly requested as cold, independent, or two-model; a repair follows a material `HOLD`; or verification evidence may be reused. | `references/convergence-control.md` | After the cold preflight when that applied; before fixing the `ReviewKey`, selecting checks, or launching a counted cold path. |
+| The active host is Claude Code. | `references/claude-runtime.md` | After the cold preflight when that applied; before repository or artifact exposure or ADT state. |
+| Always. | `references/task-lifecycle.md` | After the applicable preflights above; before any ADT state read or mutation. |
+| The write publishes commit metadata, tag metadata, a branch name, GitHub metadata, public prose, or a CI summary. | `references/publication-boundary.md` | Immediately before the persistent write. |
+| New material owner dialogue arrives: an authoritative correction, a tentative design hypothesis, or a scope challenge or question. | `references/convergence-control.md` | Before further task action, candidate edits, review launch, worker dispatch, or publication. |
+| The requested outcome or a reported or discovered symptom may depend on automatic reporting, framework or process lifecycle, termination or propagation, bootstrap, or event cardinality. | `references/incident-observability.md` | Before inspecting the artifact for an affected claim. |
+| Acceptance turns on an input-domain boundary, or a removed, deprecated, or unavailable upstream value is replaced by a local derivation. | `references/semantic-boundaries.md` | Before judging the affected claim. |
+| Any check executes source, an artifact, or a runtime. | `references/verification-environments.md` | Before executing the check and before interpreting its result. |
+| A required check needs an unavailable dependency, runtime, production bootstrap, or load-bearing environment equivalence. | `references/verification-environments.md` | Before selecting the verification approach. |
 
 When the dialogue route fires, stop incompatible work and refine the working
 plan under the convergence reference before resuming task action.
@@ -40,11 +43,20 @@ plan under the convergence reference before resuming task action.
    that remains outside this MVP.
 2. Resolve committed `BASE` and `HEAD` to immutable SHAs. Use the full accepted
    range; never substitute `HEAD^..HEAD` unless the user explicitly selected a
-   single-commit scope.
+   single-commit scope. Verify that `BASE` is an ancestor of `HEAD`; otherwise
+   proceed only on an explicitly owner-selected endpoint comparison and record
+   that choice.
 3. Form a neutral `GOAL` with review intent, acceptance criteria, accepted
    input domain and non-goals, authoritative owner decisions, and the exact
-   `$BASE..$HEAD` scope. Exclude prior findings, suspected locations,
-   severities, proposed fixes, and expected conclusions.
+   `$BASE..$HEAD` scope. For a fresh, uninformed review, exclude prior
+   findings, suspected locations, severities, proposed fixes, and expected
+   conclusions. Informed repair validation within an existing lineage instead
+   includes the specific finding under validation; it is never a fresh cold
+   path.
+   When the review carries a material security or data-assurance obligation,
+   state the applicable properties as invariants in the acceptance criteria
+   and put evidence-generation limits in the constraints; do not frame the
+   goal as attacking the artifact.
    Outside a counted cold path, investigate routine uncertainty, present a
    compact decision brief for material scope choices, and accept ordinary
    plain-language confirmation. Ask again only for a newly discovered genuine
@@ -81,13 +93,34 @@ later work there is repair validation, never a fresh cold path. Preserve
 - Review correctness, failure behavior, security and data risk, compatibility,
   architectural fit, and maintainability in proportion to the change. Check
   whether tests could pass while the requirement remains broken.
+- Assess security and data risk by verifying accepted invariants: when
+  applicable, authorization and input-validation boundaries are enforced,
+  secrets and sensitive values stay out of logs, artifacts, and evidence, and
+  failure paths preserve the accepted policy. Establish reachability from
+  source, configuration, or data-flow evidence, existing safe tests, or the
+  smallest safe bounded check within the accepted input or threat domain,
+  including inputs a boundary is required to reject. Do not create new
+  operational exploit artifacts or reusable attack tooling. These limits
+  constrain evidence generation, not analysis or reporting: report every
+  credible in-scope security concern under the ordinary taxonomy, and do not
+  omit or downgrade an evidence-backed reachable violation merely because no
+  exploit artifact was created. If stronger validation would require
+  operational attack material, stop at the strongest safe evidence and record
+  the smallest safe resolving check or the required-evidence gap. If the
+  accepted contract explicitly requires active exploit construction, record a
+  required-evidence gap rather than silently substituting weaker analysis.
 - Run focused, read-only, discriminating checks when the environment is ready.
   Record commands, outcomes, and environment limits; do not turn an unavailable
   broad suite into a finding unless an accepted claim requires that evidence.
-- Report findings first, ordered by materiality, with precise artifact
-  evidence, the violated accepted claim or repository constraint, and the
-  reachable in-domain consequence. Distinguish blockers, non-blocking
-  observations, and open questions. If none survive, state residual gaps.
+- Report artifact-grounded review concerns first, ordered by materiality.
+  Classify each as a blocking finding, a non-blocking observation, or an open
+  question; do not omit a credible concern solely because reachability,
+  impact, or contract status remains unresolved. Each blocking finding must
+  cite precise artifact evidence, the violated accepted claim or repository
+  constraint, and the reachable in-domain consequence. For an open question,
+  name the unresolved fact and the smallest discriminating check. If there
+  are no blocking findings, say so and state observations, open questions,
+  and residual gaps.
 - In a counted cold path, record a missing normative input as a terminal gap or
   `HOLD`; never ask the launcher, root, owner, or another agent for it. Outside
   a counted cold path, follow the ordinary owner-decision route.

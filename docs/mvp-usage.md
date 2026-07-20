@@ -153,8 +153,9 @@ Use `--accept-drift` on `resume` only after inspecting and explicitly accepting
 the reported worktree change. Use `claude` instead of `codex` when Claude Code
 owns the current lease.
 
-After a handoff, open a fresh session on the target host and invoke the same
-skill explicitly:
+After a handoff, verify the target host runs the same installed plugin
+release, then open a fresh session there and invoke the same skill
+explicitly:
 
 ```text
 /ai-dev-team:develop Continue the handed-off task from its checkpoint.

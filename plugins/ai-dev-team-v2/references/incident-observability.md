@@ -1,8 +1,10 @@
 # Incident observability and lifecycle
 
-Load this reference only when the claimed outcome actually depends on
-automatic reporting, framework or process lifecycle, termination or
-propagation, bootstrap, or event cardinality. Do not apply it to every bug.
+Load this reference when the requested outcome or a reported or discovered
+symptom may depend on automatic reporting, framework or process lifecycle,
+termination or propagation, bootstrap, or event cardinality — including
+missing, duplicate, or misordered reports or events. Do not apply it to
+every bug.
 
 ## Required outcomes
 

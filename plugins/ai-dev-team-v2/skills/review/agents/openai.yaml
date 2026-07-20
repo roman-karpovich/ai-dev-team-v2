@@ -1,6 +1,6 @@
 interface:
   display_name: "Evidence-Based Review"
-  short_description: "Run an independent evidence-based review"
+  short_description: "Run a controlled evidence-based review"
   default_prompt: "Use $ai-dev-team:review to inspect this change against its accepted intent and evidence."
 policy:
   allow_implicit_invocation: false
