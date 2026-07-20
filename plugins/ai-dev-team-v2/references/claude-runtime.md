@@ -11,6 +11,7 @@ complete the independence preflight before applying this runtime choice.
 - Without an explicit choice, prefer Opus 4.8 for bounded, well-specified, or
   routine work. Prefer Fable 5 for highest-complexity, long-horizon,
   architecture-wide, or high-ambiguity work.
+- Use `xhigh` effort for both models.
 - Treat a review as security-focused only when security assurance is its
   primary accepted goal, not merely one proportional dimension of an ordinary
   review. For security-focused analysis, prefer Opus 4.8 unless the owner
@@ -36,8 +37,8 @@ complete the independence preflight before applying this runtime choice.
 Manual examples:
 
 ```text
-claude --model claude-opus-4-8
-claude --model claude-fable-5
+claude --model claude-opus-4-8 --effort xhigh
+claude --model claude-fable-5 --effort xhigh
 ```
 
 ## Communicate deliberately

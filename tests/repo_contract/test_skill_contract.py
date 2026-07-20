@@ -1477,6 +1477,17 @@ class SkillContractTest(unittest.TestCase):
         allowed = (PLUGIN / "references/claude-runtime.md").resolve()
         self.assertEqual({allowed}, model_selector_sources())
 
+    def test_claude_models_use_xhigh_effort(self) -> None:
+        runtime = read(PLUGIN / "references/claude-runtime.md")
+
+        self.assertIn("Use `xhigh` effort for both models.", runtime)
+        self.assertIn(
+            "claude --model claude-opus-4-8 --effort xhigh", runtime
+        )
+        self.assertIn(
+            "claude --model claude-fable-5 --effort xhigh", runtime
+        )
+
     def test_installed_source_discovery_covers_every_utf8_text_type(self) -> None:
         with TemporaryDirectory() as directory:
             root = Path(directory)
