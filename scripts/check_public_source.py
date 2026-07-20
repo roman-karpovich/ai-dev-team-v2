@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reject non-portable locators from publishable repository files."""
+"""Reject non-portable locators from publishable files and Git messages."""
 
 from __future__ import annotations
 
@@ -153,6 +153,70 @@ def scan_history(
     return violations
 
 
+def scan_commit_messages(
+    root: Path, external_patterns: Sequence[bytes] = (), ref: str = "HEAD"
+) -> list[Violation]:
+    root = root.resolve()
+    result = subprocess.run(
+        ["git", "log", "--format=%H%x00%B%x00", ref],
+        cwd=root,
+        check=True,
+        stdout=subprocess.PIPE,
+    )
+    fields = result.stdout.split(b"\0")
+    violations: list[Violation] = []
+    for index in range(0, len(fields) - 1, 2):
+        object_id = fields[index].strip()
+        message = fields[index + 1]
+        if not object_id:
+            continue
+        violations.extend(
+            find_line_violations(
+                f"commit@{os.fsdecode(object_id[:12])}",
+                message,
+                external_patterns,
+            )
+        )
+    return violations
+
+
+def scan_annotated_tag_messages(
+    root: Path, external_patterns: Sequence[bytes] = ()
+) -> list[Violation]:
+    root = root.resolve()
+    result = subprocess.run(
+        [
+            "git",
+            "for-each-ref",
+            "--format=%(refname) %(objecttype) %(objectname)",
+            "refs/tags",
+        ],
+        cwd=root,
+        check=True,
+        stdout=subprocess.PIPE,
+    )
+    violations: list[Violation] = []
+    for record in result.stdout.splitlines():
+        _raw_ref, object_type, object_id = record.split(b" ", 2)
+        if object_type != b"tag":
+            continue
+        tag = subprocess.run(
+            ["git", "cat-file", "tag", os.fsdecode(object_id)],
+            cwd=root,
+            check=True,
+            stdout=subprocess.PIPE,
+        ).stdout
+        _, separator, message = tag.partition(b"\n\n")
+        if not separator:
+            message = b""
+        violations.extend(
+            find_line_violations(
+                f"tag@{os.fsdecode(object_id[:12])}", message, external_patterns
+            )
+        )
+    return violations
+
+
 def load_external_patterns() -> tuple[bytes, ...]:
     pattern_file = os.environ.get("PUBLIC_SOURCE_PATTERNS_FILE")
     if not pattern_file:
@@ -169,6 +233,8 @@ def main() -> int:
     external_patterns = load_external_patterns()
     violations = scan_repo(root, external_patterns)
     violations.extend(scan_history(root, external_patterns))
+    violations.extend(scan_commit_messages(root, external_patterns))
+    violations.extend(scan_annotated_tag_messages(root, external_patterns))
     for violation in violations:
         print(f"{violation.path}:{violation.line}: {violation.rule}")
     return 1 if violations else 0

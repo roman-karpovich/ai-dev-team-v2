@@ -132,6 +132,9 @@ streams. Checkpoint the card, batch compatible plugin surgery, install one
 payload, then resume the card. Do not cachebust for documentation or test-only
 adjustments that cannot affect installed behavior.
 
+Interleave plugin and card execution, not provenance. Public plugin artifacts
+describe the reusable failure class, not the originating card or repository.
+
 Identity, start, end, terminal state, tokens, and cost are metrics only when a
 launcher or backend actually observes them; never ask a model to attest them.
 Until then they are policy targets, not required fields. Prefer premature-cold

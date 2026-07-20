@@ -140,6 +140,22 @@ Raw red/green logs are not archived by default. ADRs, runbooks, migration notes,
 review reports, and reproduction notes are added only when they have durable
 value of their own, then linked from the closeout instead of duplicated.
 
+## Publication hygiene
+
+Immediately before a commit, tag, branch push, GitHub metadata write, public-doc
+write, or CI summary, the skill gates the exact outbound bytes:
+
+```bash
+adt publication-gate --destination-repo "$DESTINATION_REPO" \
+  --input "$OUTBOUND_FILE" --patterns-file "$PATTERNS_FILE"
+```
+
+The destination's GitHub owner is the default trust domain. Cross-owner links,
+autolinks, profiles, and mentions return `HOLD`; temporary case-insensitive
+patterns cover bare names and SHAs known from the task. The gate has no
+autonomous cross-owner bypass, and its patterns and receipt are never durable
+artifacts. See the [publication boundary](plugins/ai-dev-team-v2/references/publication-boundary.md).
+
 ## Process report
 
 Ask the agent for an `adt report` when you want to compare task runs or analyze

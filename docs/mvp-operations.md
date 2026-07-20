@@ -127,6 +127,22 @@ defined by the [portable cold-review bundle contract](https://github.com/roman-k
 `REPORT_ONLY` exits successfully but is not acceptance. `HOLD` emits structured
 JSON and exits 5.
 
+Validate exact outbound publication bytes:
+
+```bash
+adt publication-gate --destination-repo "$DESTINATION_REPO" \
+  --input "$OUTBOUND_FILE" --patterns-file "$PATTERNS_FILE"
+```
+
+This command is local-only and needs no Git workspace. The destination owner is
+the default GitHub trust domain. `--patterns-file` supplies case-insensitive
+literals that the built-in link checks cannot infer; omit it only when the task
+has no such cross-domain or private identity. `HOLD` exits 5, errors exit 3,
+and success returns an ephemeral exact-byte receipt. The command never
+publishes. Follow the
+[publication boundary](https://github.com/roman-karpovich/ai-dev-team-v2/blob/master/plugins/ai-dev-team-v2/references/publication-boundary.md)
+for routing and retention rules.
+
 ## State and snapshots
 
 State lives under the Git common directory and is keyed by worktree. This lets

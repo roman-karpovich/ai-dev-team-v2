@@ -26,6 +26,7 @@ SNAPSHOT_FORMAT_VERSION = 2
 STATE_NAMESPACE = "ai-dev-team"
 OPEN_STATUSES = frozenset({"active", "paused"})
 REVIEW_HOLD_EXIT_CODE = 5
+PUBLICATION_HOLD_EXIT_CODE = 5
 STATE_UNAVAILABLE_MESSAGE = (
     "ADT needs read/write access to its state directory under the common Git "
     "directory."
@@ -1591,6 +1592,26 @@ def command_review_gate(arguments: argparse.Namespace) -> dict[str, Any]:
     return {"ok": result["verdict"] == "REPORT_ONLY", "command": "review-gate", **result}
 
 
+def command_publication_gate(arguments: argparse.Namespace) -> dict[str, Any]:
+    # This gate is intentionally independent of Git discovery and task state:
+    # callers supply the exact outbound bytes it evaluates and receipts.
+    import publication_gate
+
+    try:
+        result = publication_gate.evaluate_publication(
+            destination_repository=arguments.destination_repo,
+            input_path=Path(arguments.input),
+            patterns_path=(
+                Path(arguments.patterns_file)
+                if arguments.patterns_file is not None
+                else None
+            ),
+        )
+    except publication_gate.PublicationGateError as error:
+        raise CliError(error.code, error.message) from error
+    return {"command": "publication-gate", **result}
+
+
 def build_parser() -> JsonArgumentParser:
     parser = JsonArgumentParser(prog="adt")
     parser.add_argument(
@@ -1675,12 +1696,26 @@ def build_parser() -> JsonArgumentParser:
         metavar="DIRECTORY",
         help="Directory containing bundle.json and its referenced files.",
     )
+
+    publication_gate = subparsers.add_parser(
+        "publication-gate",
+        help="Check exact outbound text for disallowed repository references.",
+    )
+    publication_gate.add_argument(
+        "--destination-repo",
+        required=True,
+        metavar="OWNER/REPO",
+    )
+    publication_gate.add_argument("--input", required=True, metavar="FILE")
+    publication_gate.add_argument("--patterns-file", metavar="FILE")
     return parser
 
 
 def dispatch(arguments: argparse.Namespace) -> dict[str, Any]:
     if arguments.command == "review-gate":
         return command_review_gate(arguments)
+    if arguments.command == "publication-gate":
+        return command_publication_gate(arguments)
     workspace = GitWorkspace.discover(Path(arguments.workspace))
     store = StateStore(workspace)
     if arguments.command == "start":
@@ -1720,6 +1755,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         _emit(result, sys.stdout)
         if arguments.command == "review-gate" and result["verdict"] == "HOLD":
             return REVIEW_HOLD_EXIT_CODE
+        if (
+            arguments.command == "publication-gate"
+            and result.get("verdict") == "HOLD"
+        ):
+            return PUBLICATION_HOLD_EXIT_CODE
         return 0
     except CliError as error:
         _emit(
@@ -1746,6 +1786,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     except Exception:
         if arguments is not None and arguments.command == "review-gate":
             message = "The review gate failed before it could produce a verdict."
+        elif arguments is not None and arguments.command == "publication-gate":
+            message = "The publication gate failed before it could produce a verdict."
         elif arguments is not None and arguments.command == "report":
             message = "The report failed before it could be produced."
         else:
