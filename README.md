@@ -12,7 +12,7 @@ handoffs durable while leaving coding and review judgment to the active host.
 
 ## Status
 
-`v0.1.54` is the current experimental supervised-autonomy prerelease. It is ready
+`v0.1.55` is the current experimental supervised-autonomy prerelease. It is ready
 for dogfood on real repositories with an owner available for genuine product,
 architecture, scope, or release-authority forks.
 
@@ -49,13 +49,13 @@ The installer registers a local marketplace and links `~/.local/bin/adt` to the
 selected checkout. Install from a permanent directory: moving or deleting that
 checkout breaks the CLI and invalidates the marketplace source.
 
-## Install v0.1.54
+## Install v0.1.55
 
 Clone the release into a durable location:
 
 ```bash
 mkdir -p "$HOME/src"
-git clone --branch v0.1.54 --depth 1 \
+git clone --branch v0.1.55 --depth 1 \
   https://github.com/roman-karpovich/ai-dev-team-v2.git \
   "$HOME/src/ai-dev-team-v2"
 cd "$HOME/src/ai-dev-team-v2"
@@ -207,7 +207,8 @@ Snapshots bind the commit and the staged, unstaged, and untracked change set;
 they do not store file bodies or patches.
 
 The active agent can pause, resume, or hand a task to the other host. Handoff
-does not launch that host. Open a fresh session there and invoke the same skill
+does not launch that host. Verify that both hosts run the same installed
+plugin release, then open a fresh session there and invoke the same skill
 with a continuation request, for example:
 
 ```text

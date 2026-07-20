@@ -6,8 +6,9 @@ after any required cold-review and host-runtime preflight.
 ## Bind state truthfully
 
 - Require `adt` on `PATH`; otherwise stop, request MVP installation, and use a
-  fresh host session. Inside a counted cold path, record a terminal gap
-  instead of requesting installation. Never simulate state.
+  fresh host session. Inside a counted cold path, do not request installation
+  or start a fresh session; record a terminal gap at the sealed output
+  destination and return the terminal marker. Never simulate state.
 - During normal skill use, the agent runs lifecycle commands; do not ask the
   owner to operate the CLI.
 - Treat plain-text replies in the same task as answers, corrections, or
@@ -40,9 +41,11 @@ Takeover cannot seize another host's task.
 Checkpoint a coherent increment before pausing or handing off. Pause rather
 than retain an active lease while waiting. Complete only when that task's
 closeout rules are satisfied. Completion closes workflow state; it is never a
-release recommendation or authorization. End a completing or pausing turn
-with one owner-facing summary: the outcome first, then artifacts, checks and
-gaps, independent-review state, residual risk, and the next action.
+release recommendation or authorization. Outside a counted cold path, end a
+completing or pausing turn with one owner-facing summary: the outcome first,
+then artifacts, checks and gaps, independent-review state, residual risk, and
+the next action. Inside a counted cold path, that summary belongs in the
+sealed output; return only the opaque terminal marker.
 
 ## Keep durable artifacts minimal
 

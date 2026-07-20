@@ -11,8 +11,8 @@ not launch another provider automatically or repair findings unless the user
 explicitly changes the task.
 
 Resolve every `references/...` locator below from the installed plugin root —
-the directory containing this plugin's manifest — not from this skill
-directory.
+the installed plugin directory that contains `skills/` and `references/` —
+not from this skill directory.
 
 ## Route references
 
@@ -23,7 +23,7 @@ applies.
 | When | Resource | Read it |
 | --- | --- | --- |
 | The review is explicitly requested as cold, independent, or two-model. | `references/cold-independent-review.md` | First — before artifact inspection, repository context, or ADT state. |
-| The review is cold, independent, or two-model; a repair follows a material `HOLD`; or verification evidence may be reused. | `references/convergence-control.md` | After the cold preflight when that applied; before fixing the `ReviewKey`, selecting checks, or launching a counted cold path. |
+| The review is explicitly requested as cold, independent, or two-model; a repair follows a material `HOLD`; or verification evidence may be reused. | `references/convergence-control.md` | After the cold preflight when that applied; before fixing the `ReviewKey`, selecting checks, or launching a counted cold path. |
 | The active host is Claude Code. | `references/claude-runtime.md` | After the cold preflight when that applied; before repository or artifact exposure or ADT state. |
 | Always. | `references/task-lifecycle.md` | After the applicable preflights above; before any ADT state read or mutation. |
 | The write publishes commit metadata, tag metadata, a branch name, GitHub metadata, public prose, or a CI summary. | `references/publication-boundary.md` | Immediately before the persistent write. |
@@ -108,8 +108,7 @@ later work there is repair validation, never a fresh cold path. Preserve
   operational attack material, stop at the strongest safe evidence and record
   the smallest safe resolving check or the required-evidence gap. If the
   accepted contract explicitly requires active exploit construction, record a
-  required-evidence or capability gap rather than silently substituting
-  weaker analysis.
+  required-evidence gap rather than silently substituting weaker analysis.
 - Run focused, read-only, discriminating checks when the environment is ready.
   Record commands, outcomes, and environment limits; do not turn an unavailable
   broad suite into a finding unless an accepted claim requires that evidence.

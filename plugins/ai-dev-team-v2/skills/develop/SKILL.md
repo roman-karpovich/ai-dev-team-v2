@@ -10,8 +10,8 @@ task boundaries without replacing its planning, tools, dialogue, subagents, or
 repository instructions. Do not launch another provider automatically.
 
 Resolve every `references/...` locator below from the installed plugin root —
-the directory containing this plugin's manifest — not from this skill
-directory.
+the installed plugin directory that contains `skills/` and `references/` —
+not from this skill directory.
 
 ## Route references
 
@@ -103,9 +103,10 @@ checkpoint.
 - Before completion, disclose whether independent review ran. When the owner,
   repository policy, or task contract requires it, freeze an immutable commit
   range and keep the development task open but paused while fresh standalone
-  cold paths run in separate checkouts; do not complete it before post-embargo
-  adjudication. Provide only neutral scope and acceptance input, never builder
-  findings or transcript.
+  cold paths run in separate checkouts under
+  `references/cold-independent-review.md`; do not complete it before
+  post-embargo adjudication. Provide only neutral scope and acceptance input,
+  never builder findings or transcript.
 - Complete only after the requested outcome and focused discriminating checks
   are satisfied and no blocking owner decision remains. Completion records
   workflow state, not release authorization or trusted review.

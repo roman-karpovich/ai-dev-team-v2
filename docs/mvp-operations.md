@@ -102,6 +102,9 @@ adt --workspace "$WORKSPACE" handoff --host "$HOST" --lease "$LEASE" --to "$TARG
 adt --workspace "$WORKSPACE" takeover --host "$HOST" --reason "$REASON"
 ```
 
+Before a cross-host handoff, verify both hosts run the same installed plugin
+release and continue in a fresh target-host session.
+
 Handoff pauses and reserves the task for `TARGET`. Takeover is only for a new
 session of the same host after explicit approval; it rotates the abandoned
 lease and records why. It cannot seize a lease owned by another host.
@@ -198,7 +201,7 @@ codex \
   -c 'memories.use_memories=false' \
   -c 'memories.generate_memories=false' \
   exec --ephemeral \
-  --sandbox read-only \
+  --sandbox workspace-write \
   "$NEUTRAL_WORK_ORDER"
 ```
 
@@ -206,8 +209,12 @@ codex \
 renamed or removed memory key fails at session launch instead of silently
 loading memories; the rejection happens at launch, not on `--version` or
 `doctor`, so confirm it on the installed version. `codex exec` is
-noninteractive but fully agentic. Confirm plugin availability in this mode
-before counting the path; `--ephemeral` does not by itself exclude
+noninteractive but fully agentic. A counted path must write its own review
+state and sealed report, so a fully read-only sandbox cannot produce a
+countable result: keep the artifact checkout itself read-only (for example
+via filesystem permissions) while the sandbox allows writes to the path's
+state and sealed output destination. Confirm plugin availability in this
+mode before counting the path; `--ephemeral` does not by itself exclude
 candidate-modified instruction files from the checkout.
 
 Claude Code 2.1.215, one-shot form; `--no-session-persistence` only works
@@ -222,11 +229,15 @@ claude --bare --print --no-session-persistence \
 
 `--print` removes interactive user turns, not agentic tool use. `--bare`
 skips automatic plugin sync, hooks, and auto memory; load the plugin
-explicitly with `--plugin-dir` and authenticate with an API key. There is no
-supported interactive zero-persistence form: an interactive
+explicitly with `--plugin-dir` and authenticate with an API key. The
+`CLAUDE_CODE_DISABLE_AUTO_MEMORY` variable is redundant on this version when
+`--bare` is present; keep it as belt-and-suspenders for versions where it is
+the only auto-memory control. There is no supported interactive
+zero-persistence form: an interactive
 `claude --bare --plugin-dir "$TRUSTED_PLUGIN_DIR"` session starts
-inbound-clean but persists its own new transcript, so count it only under a
-profile that requires a fresh context rather than zero persistence.
+inbound-clean but persists its own new transcript, so count it only when
+zero session persistence was not explicitly required by the owner or the
+work order.
 
 ## Troubleshooting
 

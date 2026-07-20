@@ -83,8 +83,9 @@ Declare one purpose before each path:
 
 A final-acceptance cold path is eligible ex ante only when its artifact is
 immutable and clean, contract and accepted domain are fixed, focused checks
-are current for its `ArtifactKey`, any declared adversarial-integration path
-has completed, known blockers, evidence gaps, and owner decisions are closed,
+are current for its `ArtifactKey`, adversarial integration has completed or
+the owner explicitly accepted running this generation without it, known
+blockers, evidence gaps, and owner decisions are closed,
 and no edit lane is active or planned. An explicit `diagnostic-cold` path may reduce uncertainty
 but never counts as final acceptance. Do not launch cold review on a candidate
 with a known-open blocker or planned edit.
